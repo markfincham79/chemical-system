@@ -552,6 +552,61 @@
       font-size: 12px; color: #666; line-height: 1.75;
     }
 
+    /* ==============================================
+       PHASE 4 — DASHBOARD, INVOICE DETAIL, FILTERS
+       ============================================== */
+
+    /* Badge — voided invoice */
+    .badge-void { background: #f8d7da; color: #721c24; }
+
+    /* Dashboard layout */
+    .dash-panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 20px;
+    }
+    .dash-panel {
+      background: white;
+      border: 1px solid #e8ece5;
+      border-radius: 8px;
+      padding: 18px 20px;
+    }
+    .dash-panel-title {
+      font-size: 13px; font-weight: 700; color: #2D5016;
+      margin-bottom: 12px; padding-bottom: 8px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .dash-alert-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 7px 0; border-bottom: 1px solid #f7f7f7; font-size: 13px;
+    }
+    .dash-alert-item:last-child { border-bottom: none; }
+
+    /* Inventory filter toggle buttons */
+    .filter-toggle-group { display: flex; gap: 6px; margin-bottom: 14px; }
+    .filter-toggle-btn {
+      padding: 5px 14px; font-size: 12px; font-weight: 500;
+      border: 1.5px solid #ddd; border-radius: 20px;
+      background: white; color: #666; cursor: pointer;
+      font-family: inherit; transition: all 0.15s;
+    }
+    .filter-toggle-btn:hover { border-color: #4A7C2F; color: #4A7C2F; }
+    .filter-toggle-btn.active { background: #4A7C2F; border-color: #4A7C2F; color: white; }
+
+    /* Threshold setting panel */
+    .threshold-row {
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px 0; border-bottom: 1px solid #f0f0f0;
+    }
+    .threshold-row label { font-size: 14px; font-weight: 600; color: #333; flex: 1; }
+    .threshold-row .form-hint { font-size: 12px; color: #888; font-weight: 400; }
+    .threshold-input { width: 80px !important; text-align: center; }
+
+    @media (max-width: 900px) {
+      .dash-panels { grid-template-columns: 1fr; }
+    }
+
     @media (max-width: 700px) {
       .sidebar { width: 52px; }
       .nav-link span:not(.nav-icon) { display: none; }
@@ -699,12 +754,8 @@
           <h2>Dashboard</h2>
           <p>Overview of inventory, activity, and alerts.</p>
         </div>
-        <div class="placeholder-card">
-          <div class="placeholder-icon">&#9783;</div>
-          <h3>Dashboard</h3>
-          <p>Summary cards: total chemicals, inventory value at FIFO cost,
-             invoices this month, and low-stock alerts.</p>
-          <span class="placeholder-badge">Coming in Phase 4</span>
+        <div id="dash-content">
+          <div class="empty-state"><p>Loading&hellip;</p></div>
         </div>
       </div>
 
@@ -733,6 +784,14 @@
           <h2>Inventory</h2>
           <p>Current on-hand quantities with FIFO lot breakdown and cost per unit.</p>
         </div>
+        <div class="filter-toggle-group">
+          <button class="filter-toggle-btn active" id="inv-filter-all"
+                  onclick="setInventoryFilter('all')">All</button>
+          <button class="filter-toggle-btn" id="inv-filter-low"
+                  onclick="setInventoryFilter('low')">Low Stock</button>
+          <button class="filter-toggle-btn" id="inv-filter-zero"
+                  onclick="setInventoryFilter('zero')">Out of Stock</button>
+        </div>
         <div id="inventory-stats-row" class="stats-row"></div>
         <div id="inventory-table-container">
           <div class="empty-state"><p>Loading&hellip;</p></div>
@@ -753,6 +812,10 @@
             <select class="filter-select" id="purch-filter-vendor" onchange="filterPurchases()">
               <option value="">All Vendors</option>
             </select>
+            <input type="date" class="filter-select" id="purch-filter-from"
+                   style="min-width:130px" title="From date" onchange="filterPurchases()">
+            <input type="date" class="filter-select" id="purch-filter-to"
+                   style="min-width:130px" title="To date" onchange="filterPurchases()">
           </div>
           <button class="btn btn-primary" onclick="openPurchaseForm()">+ Log Purchase</button>
         </div>
@@ -790,10 +853,37 @@
         <!-- LIST VIEW (default) -->
         <div id="invoice-list-view">
           <div class="section-toolbar">
-            <div class="toolbar-left"></div>
+            <div class="toolbar-left filter-row">
+              <select class="filter-select" id="inv-filter-cust" onchange="renderInvoicesList()"
+                      style="min-width:160px">
+                <option value="">All Customers</option>
+              </select>
+              <input type="date" class="filter-select" id="inv-filter-from"
+                     style="min-width:130px" title="From date" onchange="renderInvoicesList()">
+              <input type="date" class="filter-select" id="inv-filter-to"
+                     style="min-width:130px" title="To date" onchange="renderInvoicesList()">
+              <select class="filter-select" id="inv-filter-status" onchange="renderInvoicesList()"
+                      style="min-width:110px">
+                <option value="">All Status</option>
+                <option value="Active">Active</option>
+                <option value="Void">Void</option>
+              </select>
+            </div>
             <button class="btn btn-primary" onclick="showInvoiceBuilder()">+ Create Invoice</button>
           </div>
           <div id="invoices-table-container">
+            <div class="empty-state"><p>Loading&hellip;</p></div>
+          </div>
+        </div>
+
+        <!-- DETAIL VIEW (hidden until a row is clicked) -->
+        <div id="invoice-detail-view" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+            <button class="btn btn-ghost btn-sm" onclick="closeInvoiceDetail()">&#8592; Back to Invoices</button>
+            <span style="font-size:16px;font-weight:700;color:#2D5016;" id="inv-detail-title">Invoice</span>
+            <div style="width:130px"></div>
+          </div>
+          <div id="inv-detail-content">
             <div class="empty-state"><p>Loading&hellip;</p></div>
           </div>
         </div>
@@ -889,6 +979,8 @@
                   onclick="showSettingsTab('size-units')">Size Units</button>
           <button class="sub-tab" data-tab="vendors"
                   onclick="showSettingsTab('vendors')">Vendors</button>
+          <button class="sub-tab" data-tab="general"
+                  onclick="showSettingsTab('general')">General</button>
         </div>
 
         <!-- Size Units panel -->
@@ -919,6 +1011,24 @@
             <div class="empty-state"><p>Loading&hellip;</p></div>
           </div>
         </div>
+        <!-- General settings panel -->
+        <div id="settings-panel-general" class="settings-panel">
+          <div style="max-width:560px;">
+            <p style="font-size:13px;color:#666;margin-bottom:20px;">
+              These settings control system-wide behaviour and are stored in the Settings sheet.
+            </p>
+            <div class="threshold-row">
+              <div>
+                <label class="form-label" for="setting-threshold">Low Stock Threshold</label>
+                <div class="form-hint">Alert when a chemical&rsquo;s on-hand quantity falls below this number.</div>
+              </div>
+              <input type="number" id="setting-threshold" class="form-control threshold-input"
+                     min="1" step="1" value="10">
+              <button class="btn btn-primary btn-sm" onclick="saveThreshold()">Save</button>
+            </div>
+          </div>
+        </div>
+
       </div><!-- /section-settings -->
 
     </main><!-- /content -->
@@ -1016,6 +1126,7 @@ const HEADERS = {
   Invoices:     ['ID','InvoiceNumber','Date','CustomerID','GrandTotal','Status','Notes','CreatedBy','CreatedAt'],
   InvoiceLines: ['ID','InvoiceID','ChemicalID','SizeUnit','Qty','ListPrice','SalePrice','PriceOverridden','LineTotal','FIFOCostPerUnit'],
   FIFOLedger:   ['ID','InvoiceLineID','PurchaseLotID','QtyConsumed','CostPerUnit','Date'],
+  Settings:     ['Key','Value'],
 };
 
 const DEFAULT_SIZE_UNITS = ['oz','pint','quart','gallon','2.5 gal','30 gal','tote','lb','bag'];
@@ -1046,6 +1157,11 @@ let _savedInvoiceData    = null;     // stored after save, for printing
 
 // Confirm dialog callback
 let _confirmCallback = null;
+
+// Phase 4 state
+let _settings          = null;  // raw array of { Key, Value } rows from Settings sheet
+let _lowStockThreshold = 10;    // numeric, loaded from Settings sheet
+let _invStockFilter    = 'all'; // inventory filter: 'all' | 'low' | 'zero'
 
 /* ===========================================================
    GIS / GAPI LIBRARY CALLBACKS
@@ -1237,6 +1353,12 @@ async function initializeSheets() {
     // Flatten and append all at once
     const allRows = DEFAULT_SIZE_UNITS.map((label, i) => [generateId(), label, String(i + 1)]);
     await appendRows('SizeUnits', allRows);
+  }
+
+  // Seed Settings with defaults if empty
+  const settingsData = await loadSheetData('Settings');
+  if (settingsData.length === 0) {
+    await appendSheetRow('Settings', { Key: 'LowStockThreshold', Value: '10' });
   }
 }
 
@@ -1770,7 +1892,7 @@ async function renderSettings() {
   setLoading(true, 'Loading settings…');
   try {
     await ensureSheetsInitialized();
-    await Promise.all([loadSizeUnitsPanel(), loadVendorsPanel()]);
+    await Promise.all([loadSizeUnitsPanel(), loadVendorsPanel(), loadGeneralSettings()]);
     // Re-apply active tab in case navTo was called before
     const activeTab = document.querySelector('.sub-tab.active')?.dataset.tab || 'size-units';
     showSettingsTab(activeTab);
@@ -1843,10 +1965,14 @@ function renderPurchasesHistory() {
   const container  = document.getElementById('purchases-table-container');
   const chemFilter = document.getElementById('purch-filter-chemical')?.value || '';
   const vendFilter = document.getElementById('purch-filter-vendor')?.value   || '';
+  const fromFilter = document.getElementById('purch-filter-from')?.value     || '';
+  const toFilter   = document.getElementById('purch-filter-to')?.value       || '';
 
   let rows = [...(_purchases || [])];
   if (chemFilter) rows = rows.filter(p => p.ChemicalID === chemFilter);
   if (vendFilter) rows = rows.filter(p => p.VendorID   === vendFilter);
+  if (fromFilter) rows = rows.filter(p => (p.Date || '') >= fromFilter);
+  if (toFilter)   rows = rows.filter(p => (p.Date || '') <= toFilter);
 
   // Most recent first
   rows.sort((a, b) => new Date(b.Date) - new Date(a.Date));
@@ -2165,12 +2291,14 @@ async function loadInventorySection() {
 function renderInventoryTable() {
   const statsEl    = document.getElementById('inventory-stats-row');
   const container  = document.getElementById('inventory-table-container');
-  const activeChems = (_chemicals || []).filter(c => c.Active !== 'FALSE');
-  const purchByChemId = groupByField(_purchases || [], 'ChemicalID');
+  const threshold  = _lowStockThreshold || 10;
+  const stockFilter = _invStockFilter || 'all';
+  const allActiveChems = (_chemicals || []).filter(c => c.Active !== 'FALSE');
+  const purchByChemId  = groupByField(_purchases || [], 'ChemicalID');
 
-  // Compute summary stats
+  // Compute summary stats (always over all active chems, not filtered)
   let totalValue = 0, totalLots = 0, zeroCount = 0, lowCount = 0;
-  for (const chem of activeChems) {
+  for (const chem of allActiveChems) {
     const lots   = purchByChemId[chem.ID] || [];
     const onHand = lots.reduce((s, l) => s + (parseFloat(l.RemainingQty) || 0), 0);
     for (const lot of lots) {
@@ -2178,15 +2306,15 @@ function renderInventoryTable() {
       totalValue += rem * (parseFloat(lot.CostPerUnit) || 0);
       if (rem > 0) totalLots++;
     }
-    if (onHand === 0)        zeroCount++;
-    else if (onHand < 10)    lowCount++;
+    if (onHand === 0)            zeroCount++;
+    else if (onHand < threshold) lowCount++;
   }
 
   if (statsEl) {
     statsEl.innerHTML =
       `<div class="stat-card">
          <div class="stat-label">Active Chemicals</div>
-         <div class="stat-value">${activeChems.length}</div>
+         <div class="stat-value">${allActiveChems.length}</div>
        </div>
        <div class="stat-card">
          <div class="stat-label">Inventory Value (Cost)</div>
@@ -2202,13 +2330,31 @@ function renderInventoryTable() {
          <div class="stat-value" style="color:#c0392b">${zeroCount}</div>
        </div>` : ''}
        ${lowCount > 0 ? `<div class="stat-card" style="border-left:3px solid #d68910">
-         <div class="stat-label" style="color:#d68910">Low Stock (&lt;10)</div>
+         <div class="stat-label" style="color:#d68910">Low Stock (&lt;${threshold})</div>
          <div class="stat-value" style="color:#d68910">${lowCount}</div>
        </div>` : ''}`;
   }
 
+  // Apply stock filter
+  let activeChems = allActiveChems;
+  if (stockFilter === 'low') {
+    activeChems = allActiveChems.filter(c => {
+      const onHand = (purchByChemId[c.ID] || []).reduce((s, l) => s + (parseFloat(l.RemainingQty) || 0), 0);
+      return onHand > 0 && onHand < threshold;
+    });
+  } else if (stockFilter === 'zero') {
+    activeChems = allActiveChems.filter(c => {
+      const onHand = (purchByChemId[c.ID] || []).reduce((s, l) => s + (parseFloat(l.RemainingQty) || 0), 0);
+      return onHand === 0;
+    });
+  }
+
   if (activeChems.length === 0) {
-    container.innerHTML = '<div class="empty-state"><p>No active chemicals. Add chemicals in the Chemicals section first.</p></div>';
+    container.innerHTML = `<div class="empty-state"><p>${stockFilter === 'all'
+      ? 'No active chemicals. Add chemicals in the Chemicals section first.'
+      : stockFilter === 'low'
+        ? `No chemicals are currently below the low stock threshold (${threshold}).`
+        : 'No chemicals are currently out of stock.'}</p></div>`;
     return;
   }
 
@@ -2218,28 +2364,40 @@ function renderInventoryTable() {
   const sorted = [...activeChems].sort((a, b) => {
     const aQty = (purchByChemId[a.ID] || []).reduce((s, l) => s + (parseFloat(l.RemainingQty) || 0), 0);
     const bQty = (purchByChemId[b.ID] || []).reduce((s, l) => s + (parseFloat(l.RemainingQty) || 0), 0);
-    if (aQty === 0 && bQty  >  0) return -1;
-    if (aQty  >  0 && bQty === 0) return  1;
-    if (aQty < 10  && bQty >= 10) return -1;
-    if (aQty >= 10 && bQty <  10) return  1;
+    if (aQty === 0 && bQty  >  0)         return -1;
+    if (aQty  >  0 && bQty === 0)         return  1;
+    if (aQty < threshold && bQty >= threshold) return -1;
+    if (aQty >= threshold && bQty < threshold) return  1;
     return (a.Name || '').localeCompare(b.Name || '');
   });
 
   const tableRows = sorted.map(chem => {
     // Lots sorted oldest-first for FIFO display
-    const lots       = (purchByChemId[chem.ID] || []).sort((a, b) => new Date(a.Date) - new Date(b.Date));
-    const onHand     = lots.reduce((s, l) => s + (parseFloat(l.RemainingQty) || 0), 0);
-    const fifoCost   = getFifoCostPerUnit(lots);
-    const value      = lots.reduce((s, l) => s + (parseFloat(l.RemainingQty) || 0) * (parseFloat(l.CostPerUnit) || 0), 0);
+    const lots      = (purchByChemId[chem.ID] || []).sort((a, b) => new Date(a.Date) - new Date(b.Date));
+    const onHand    = lots.reduce((s, l) => s + (parseFloat(l.RemainingQty) || 0), 0);
+    const fifoCost  = getFifoCostPerUnit(lots);
+    const value     = lots.reduce((s, l) => s + (parseFloat(l.RemainingQty) || 0) * (parseFloat(l.CostPerUnit) || 0), 0);
+    const sellPrice = parseFloat(chem.DefaultSellingPrice) || 0;
     const isExpanded = _expandedLots.has(chem.ID);
-    const qtyClass   = onHand === 0 ? 'qty-zero' : onHand < 10 ? 'qty-low' : '';
+    const qtyClass   = onHand === 0 ? 'qty-zero' : onHand < threshold ? 'qty-low' : '';
     const rowBg      = onHand === 0 ? 'background:#fff5f5' : '';
+
+    // Margin columns (internal-only)
+    const hasCost    = fifoCost !== null && onHand > 0;
+    const marginD    = hasCost && sellPrice > 0 ? sellPrice - fifoCost : null;
+    const marginPct  = marginD !== null && sellPrice > 0 ? (marginD / sellPrice) * 100 : null;
+    const marginDStr = marginD !== null
+      ? `<span style="color:${marginD >= 0 ? '#2D5016' : '#c0392b'}">${formatCurrency(marginD)}</span>`
+      : '<span style="color:#ccc">—</span>';
+    const marginPStr = marginPct !== null
+      ? `<span style="color:${marginPct >= 0 ? '#2D5016' : '#c0392b'}">${marginPct.toFixed(1)}%</span>`
+      : '<span style="color:#ccc">—</span>';
 
     // Lot detail rows (shown when expanded)
     let detailRow = '';
     if (isExpanded) {
       if (lots.length === 0) {
-        detailRow = `<tr class="lot-detail-row"><td colspan="5">
+        detailRow = `<tr class="lot-detail-row"><td colspan="8">
           <div class="lot-detail-inner">
             <em style="color:#aaa;font-size:12px">No purchase lots recorded for this chemical.</em>
           </div></td></tr>`;
@@ -2256,7 +2414,7 @@ function renderInventoryTable() {
             <td style="text-align:right">${formatCurrency(parseFloat(lot.CostPerUnit) || 0)}</td>
           </tr>`;
         }).join('');
-        detailRow = `<tr class="lot-detail-row"><td colspan="5">
+        detailRow = `<tr class="lot-detail-row"><td colspan="8">
           <div class="lot-detail-inner">
             <table class="lot-table">
               <thead><tr>
@@ -2285,7 +2443,10 @@ function renderInventoryTable() {
       <td style="text-align:right">
         <span class="${qtyClass}" style="font-size:16px;font-weight:700">${formatNumber(onHand)}</span>
       </td>
+      <td style="text-align:right;color:#555">${sellPrice > 0 ? formatCurrency(sellPrice) : '<span style="color:#ccc">—</span>'}</td>
       <td style="text-align:right;color:#666">${fifoCost !== null ? formatCurrency(fifoCost) : '<span style="color:#ccc">—</span>'}</td>
+      <td style="text-align:right">${marginDStr}</td>
+      <td style="text-align:right">${marginPStr}</td>
       <td style="text-align:right">${formatCurrency(value)}</td>
     </tr>${detailRow}`;
   }).join('');
@@ -2297,14 +2458,17 @@ function renderInventoryTable() {
           <th style="width:36px"></th>
           <th>Chemical</th>
           <th style="text-align:right">On-Hand</th>
+          <th style="text-align:right">Sell Price</th>
           <th style="text-align:right">FIFO Cost/Unit</th>
-          <th style="text-align:right">Inventory Value</th>
+          <th style="text-align:right">Margin $</th>
+          <th style="text-align:right">Margin %</th>
+          <th style="text-align:right">Inv. Value</th>
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>
     </table>
     <p style="font-size:11px;color:#ccc;text-align:right;margin-top:10px;padding-right:4px">
-      &#128274; FIFO cost &amp; inventory value are internal — never shown on invoices.
+      &#128274; FIFO cost, margin, and inventory value are internal &mdash; never shown on invoices.
     </p>`;
 }
 
@@ -2501,6 +2665,9 @@ function signOut() {
   _invoiceBuilderActive = false;
   _selectedCustomerId = null;
   _savedInvoiceData = null;
+  _settings = null;
+  _lowStockThreshold = 10;
+  _invStockFilter = 'all';
   if (gapiReady) gapi.client.setToken(null);
   showLoginScreen();
   setConnStatus('checking', 'Not connected');
@@ -2569,7 +2736,8 @@ async function navTo(sectionId) {
   if (link) link.classList.add('active');
 
   // Lazy-load section data
-  if      (sectionId === 'chemicals') await loadChemicalsSection();
+  if      (sectionId === 'dashboard') await loadDashboardSection();
+  else if (sectionId === 'chemicals') await loadChemicalsSection();
   else if (sectionId === 'settings')  await renderSettings();
   else if (sectionId === 'purchases') await loadPurchasesSection();
   else if (sectionId === 'inventory') await loadInventorySection();
@@ -2784,9 +2952,18 @@ function renderCustomersTable() {
     </table>`;
 }
 
-function openCustomerFormById(id) {
+async function openCustomerFormById(id) {
   const c = (_customers || []).find(c => c.ID === id);
-  if (c) openCustomerForm(c);
+  if (!c) return;
+  openCustomerForm(c);
+  // Load invoice history asynchronously for edit form
+  try {
+    if (!_invoices) _invoices = await loadSheetData('Invoices');
+    renderCustomerInvoiceHistory(id);
+  } catch (err) {
+    const hist = document.getElementById('cust-invoice-list');
+    if (hist) hist.innerHTML = '<p style="font-size:13px;color:#c0392b">Failed to load purchase history.</p>';
+  }
 }
 
 function openCustomerForm(customer = null) {
@@ -2853,6 +3030,10 @@ function openCustomerForm(customer = null) {
          <textarea id="cust-notes" class="form-control" rows="2"
                    placeholder="Optional notes">${e ? escapeHtml(customer.Notes || '') : ''}</textarea>
        </div>
+       ${e ? `<div id="cust-invoice-history" style="margin-top:22px;padding-top:18px;border-top:1px solid #eee;">
+         <div style="font-size:13px;font-weight:700;color:#2D5016;margin-bottom:10px;">Purchase History</div>
+         <div id="cust-invoice-list"><p style="font-size:13px;color:#aaa;padding:4px 0">Loading&hellip;</p></div>
+       </div>` : ''}
      </form>`,
     `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
      <button class="btn btn-primary" onclick="saveCustomerForm()">
@@ -2917,6 +3098,7 @@ async function loadInvoicesSection() {
       loadSheetData('Purchases'),
       loadSheetData('SizeUnits'),
     ]);
+    populateInvoiceFilters();
     renderInvoicesList();
   } catch (err) {
     showToast('Failed to load invoices: ' + err.message, 'error');
@@ -2926,11 +3108,28 @@ async function loadInvoicesSection() {
   }
 }
 
+function populateInvoiceFilters() {
+  const custSel = document.getElementById('inv-filter-cust');
+  if (!custSel) return;
+  const prev = custSel.value;
+  custSel.innerHTML = '<option value="">All Customers</option>' +
+    (_customers || []).map(c => {
+      const label = c.BusinessName || c.Name || c.ID;
+      return `<option value="${escapeHtml(c.ID)}">${escapeHtml(label)}</option>`;
+    }).join('');
+  if (prev) custSel.value = prev;
+}
+
 function renderInvoicesList() {
   const container = document.getElementById('invoices-table-container');
   if (!container) return;
 
-  const custMap    = buildIdMap(_customers || [], 'ID', 'BusinessName');
+  const custFilter   = document.getElementById('inv-filter-cust')?.value   || '';
+  const fromFilter   = document.getElementById('inv-filter-from')?.value   || '';
+  const toFilter     = document.getElementById('inv-filter-to')?.value     || '';
+  const statusFilter = document.getElementById('inv-filter-status')?.value || '';
+
+  const custMap     = buildIdMap(_customers || [], 'ID', 'BusinessName');
   const custNameMap = buildIdMap(_customers || [], 'ID', 'Name');
 
   if (!_invoices || _invoices.length === 0) {
@@ -2941,21 +3140,34 @@ function renderInvoicesList() {
     return;
   }
 
-  const sorted = [..._invoices].sort((a, b) =>
+  let filtered = [..._invoices].sort((a, b) =>
     (b.InvoiceNumber || '').localeCompare(a.InvoiceNumber || '')
   );
+  if (custFilter)   filtered = filtered.filter(i => i.CustomerID === custFilter);
+  if (fromFilter)   filtered = filtered.filter(i => (i.Date || '') >= fromFilter);
+  if (toFilter)     filtered = filtered.filter(i => (i.Date || '') <= toFilter);
+  if (statusFilter) filtered = filtered.filter(i => i.Status === statusFilter);
 
-  const rows = sorted.map(inv => {
+  if (filtered.length === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">&#9783;</div>
+      <p>No invoices match your filters.</p>
+    </div>`;
+    return;
+  }
+
+  const rows = filtered.map(inv => {
     const biz  = custMap[inv.CustomerID]     || '';
     const name = custNameMap[inv.CustomerID] || '';
     const displayCust = biz || name || '—';
-    return `<tr>
+    const isVoid = inv.Status === 'Void';
+    return `<tr style="cursor:pointer" onclick="openInvoiceDetail('${escapeHtml(inv.ID)}')">
       <td><strong style="color:#2D5016">${escapeHtml(inv.InvoiceNumber || '—')}</strong></td>
       <td>${formatDate(inv.Date)}</td>
       <td>${escapeHtml(displayCust)}</td>
       <td style="text-align:right"><strong>${formatCurrency(parseFloat(inv.GrandTotal) || 0)}</strong></td>
-      <td><span class="badge ${inv.Status === 'Active' ? 'badge-active' : 'badge-inactive'}">${escapeHtml(inv.Status || '—')}</span></td>
-      <td class="col-actions">
+      <td><span class="badge ${isVoid ? 'badge-void' : 'badge-active'}">${escapeHtml(inv.Status || '—')}</span></td>
+      <td class="col-actions" onclick="event.stopPropagation()">
         <div class="row-actions">
           <button class="btn btn-ghost btn-sm"
                   onclick="viewAndPrintInvoice('${escapeHtml(inv.ID)}')">&#128424; Print</button>
@@ -2993,6 +3205,7 @@ function showInvoiceBuilder() {
   _savedInvoiceData     = null;
 
   document.getElementById('invoice-list-view').style.display    = 'none';
+  document.getElementById('invoice-detail-view').style.display  = 'none';
   document.getElementById('invoice-builder-view').style.display = 'block';
   document.getElementById('invoice-save-success').style.display = 'none';
 
@@ -3029,6 +3242,7 @@ function hideInvoiceBuilder() {
   _selectedCustomerId   = null;
 
   document.getElementById('invoice-list-view').style.display    = 'block';
+  document.getElementById('invoice-detail-view').style.display  = 'none';
   document.getElementById('invoice-builder-view').style.display = 'none';
 
   loadInvoicesSection();
@@ -3657,6 +3871,507 @@ function printInvoice() {
     window.print();
     setTimeout(() => { printEl.style.display = 'none'; }, 1000);
   }, 100);
+}
+
+/* ===========================================================
+   PHASE 4 — PART A: DASHBOARD
+   =========================================================== */
+
+async function loadDashboardSection() {
+  const dashContent = document.getElementById('dash-content');
+  if (!dashContent) return;
+  dashContent.innerHTML = '<div class="empty-state"><p>Loading&hellip;</p></div>';
+  setLoading(true, 'Loading dashboard…');
+  try {
+    await ensureSheetsInitialized();
+    [_chemicals, _purchases, _invoices, _customers, _settings] = await Promise.all([
+      loadSheetData('Chemicals'),
+      loadSheetData('Purchases'),
+      loadSheetData('Invoices'),
+      loadSheetData('Customers'),
+      loadSheetData('Settings'),
+    ]);
+    // Parse threshold from settings
+    _lowStockThreshold = parseInt(
+      (_settings || []).find(r => r.Key === 'LowStockThreshold')?.Value || '10'
+    ) || 10;
+    renderDashboard();
+  } catch (err) {
+    showToast('Failed to load dashboard: ' + err.message, 'error');
+    console.error(err);
+    if (dashContent) dashContent.innerHTML = '<div class="empty-state"><p>Failed to load dashboard. Please try again.</p></div>';
+  } finally {
+    setLoading(false);
+  }
+}
+
+function renderDashboard() {
+  const dashContent = document.getElementById('dash-content');
+  if (!dashContent) return;
+
+  const threshold     = _lowStockThreshold || 10;
+  const activeChems   = (_chemicals || []).filter(c => c.Active !== 'FALSE');
+  const purchByChemId = groupByField(_purchases || [], 'ChemicalID');
+
+  // Total inventory value at FIFO cost
+  let totalValue = 0;
+  for (const chem of activeChems) {
+    const lots = purchByChemId[chem.ID] || [];
+    for (const lot of lots) {
+      totalValue += (parseFloat(lot.RemainingQty) || 0) * (parseFloat(lot.CostPerUnit) || 0);
+    }
+  }
+
+  // Invoices this month / Revenue this month (exclude Void)
+  const now       = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const activeInvoices = (_invoices || []).filter(i => i.Status !== 'Void');
+  const monthInvoices  = activeInvoices.filter(i => (i.Date || '').startsWith(thisMonth));
+  const monthRevenue   = monthInvoices.reduce((s, i) => s + (parseFloat(i.GrandTotal) || 0), 0);
+
+  // Low stock alerts
+  const lowStock = [];
+  for (const chem of activeChems) {
+    const onHand = (purchByChemId[chem.ID] || []).reduce((s, l) => s + (parseFloat(l.RemainingQty) || 0), 0);
+    if (onHand === 0 || onHand < threshold) {
+      lowStock.push({ name: chem.Name, onHand });
+    }
+  }
+  lowStock.sort((a, b) => a.onHand - b.onHand);
+
+  // Recent invoices (5 most recent Active, by invoice number desc)
+  const custMap     = buildIdMap(_customers || [], 'ID', 'BusinessName');
+  const custNameMap = buildIdMap(_customers || [], 'ID', 'Name');
+  const recentInvoices = [...activeInvoices]
+    .sort((a, b) => (b.InvoiceNumber || '').localeCompare(a.InvoiceNumber || ''))
+    .slice(0, 5);
+
+  const alertsHtml = lowStock.length === 0
+    ? '<div class="empty-state" style="padding:10px 0"><p>No low stock alerts &mdash; inventory levels are healthy.</p></div>'
+    : lowStock.map(item => `
+        <div class="dash-alert-item">
+          <span class="${item.onHand === 0 ? 'qty-zero' : 'qty-low'}" style="font-weight:600">
+            ${escapeHtml(item.name)}
+          </span>
+          <span style="font-size:12px;color:#888">
+            ${item.onHand === 0
+              ? 'Out of stock'
+              : `${formatNumber(item.onHand)} remaining`}
+          </span>
+        </div>`).join('');
+
+  const recentHtml = recentInvoices.length === 0
+    ? '<div class="empty-state" style="padding:10px 0"><p>No invoices yet.</p></div>'
+    : `<table class="data-table">
+        <thead><tr>
+          <th>Invoice #</th>
+          <th>Date</th>
+          <th>Customer</th>
+          <th style="text-align:right">Total</th>
+        </tr></thead>
+        <tbody>${recentInvoices.map(inv => {
+          const cust = custMap[inv.CustomerID] || custNameMap[inv.CustomerID] || '—';
+          return `<tr style="cursor:pointer" onclick="navToInvoiceDetail('${escapeHtml(inv.ID)}')">
+            <td><strong style="color:#2D5016">${escapeHtml(inv.InvoiceNumber || '—')}</strong></td>
+            <td>${formatDate(inv.Date)}</td>
+            <td>${escapeHtml(cust)}</td>
+            <td style="text-align:right"><strong>${formatCurrency(parseFloat(inv.GrandTotal) || 0)}</strong></td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+      <div style="text-align:right;margin-top:8px;">
+        <a href="#" style="font-size:12px;color:#4A7C2F;text-decoration:none"
+           onclick="navTo('invoices');return false">View all invoices &rarr;</a>
+      </div>`;
+
+  dashContent.innerHTML = `
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Active Chemicals</div>
+        <div class="stat-value">${activeChems.length}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Inventory Value (Cost)</div>
+        <div class="stat-value">${formatCurrency(totalValue)}</div>
+        <div class="stat-sub">at FIFO cost &mdash; internal only</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Invoices This Month</div>
+        <div class="stat-value">${monthInvoices.length}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Revenue This Month</div>
+        <div class="stat-value">${formatCurrency(monthRevenue)}</div>
+      </div>
+    </div>
+
+    <div class="dash-panels">
+      <div class="dash-panel">
+        <div class="dash-panel-title">
+          Low Stock Alerts
+          <span style="font-size:12px;font-weight:400;color:#aaa;">(below ${threshold})</span>
+        </div>
+        ${alertsHtml}
+      </div>
+      <div class="dash-panel">
+        <div class="dash-panel-title">Recent Invoices</div>
+        ${recentHtml}
+      </div>
+    </div>`;
+}
+
+/** Navigate to Invoices section then open a specific invoice detail. */
+function navToInvoiceDetail(invoiceId) {
+  navTo('invoices').then(() => openInvoiceDetail(invoiceId));
+}
+
+/** Navigate to Invoices section then open a specific invoice detail (from customer modal). */
+function goToInvoiceDetail(invoiceId) {
+  closeModal();
+  navTo('invoices').then(() => openInvoiceDetail(invoiceId));
+}
+
+/* ===========================================================
+   PHASE 4 — PART B: INVOICE DETAIL & VOID
+   =========================================================== */
+
+async function openInvoiceDetail(invoiceId) {
+  setLoading(true, 'Loading invoice…');
+  try {
+    const allLines = await loadSheetData('InvoiceLines');
+    if (!_chemicals) _chemicals = await loadSheetData('Chemicals');
+
+    const invoice  = (_invoices  || []).find(i => i.ID === invoiceId);
+    const customer = (_customers || []).find(c => c.ID === invoice?.CustomerID);
+    if (!invoice) { showToast('Invoice not found.', 'error'); return; }
+
+    const lines = allLines.filter(l => l.InvoiceID === invoiceId);
+
+    renderInvoiceDetail(invoice, customer, lines);
+
+    document.getElementById('invoice-list-view').style.display    = 'none';
+    document.getElementById('invoice-detail-view').style.display  = 'block';
+    document.getElementById('invoice-builder-view').style.display = 'none';
+
+    const content = document.getElementById('main-content');
+    if (content) content.scrollTop = 0;
+  } catch (err) {
+    showToast('Error loading invoice: ' + err.message, 'error');
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function closeInvoiceDetail() {
+  document.getElementById('invoice-list-view').style.display   = 'block';
+  document.getElementById('invoice-detail-view').style.display = 'none';
+  renderInvoicesList();
+}
+
+function renderInvoiceDetail(invoice, customer, lines) {
+  const container = document.getElementById('inv-detail-content');
+  if (!container) return;
+
+  const isVoid = invoice.Status === 'Void';
+
+  // Customer info
+  const cityStateZip = [customer?.City, customer?.State, customer?.Zip].filter(Boolean).join(', ');
+  const addrLines = [
+    customer?.BusinessName ? `<strong>${escapeHtml(customer.BusinessName)}</strong>` : '',
+    customer?.Name         ? escapeHtml(customer.Name)    : '',
+    customer?.Address      ? escapeHtml(customer.Address) : '',
+    cityStateZip           ? escapeHtml(cityStateZip)     : '',
+    customer?.Phone        ? escapeHtml(customer.Phone)   : '',
+    customer?.Email        ? escapeHtml(customer.Email)   : '',
+  ].filter(Boolean).join('<br>');
+
+  // Line items
+  const lineRows = lines.map(l => {
+    const chemName = (_chemicals || []).find(c => c.ID === l.ChemicalID)?.Name || l.ChemicalID || '—';
+    return `<tr>
+      <td>${escapeHtml(chemName)}</td>
+      <td>${escapeHtml(l.SizeUnit || '—')}</td>
+      <td style="text-align:right">${formatNumber(parseFloat(l.Qty) || 0)}</td>
+      <td style="text-align:right">${formatCurrency(parseFloat(l.SalePrice) || 0)}</td>
+      <td style="text-align:right"><strong>${formatCurrency(parseFloat(l.LineTotal) || 0)}</strong></td>
+    </tr>`;
+  }).join('');
+
+  const grandTotal = lines.reduce((s, l) => s + (parseFloat(l.LineTotal) || 0), 0);
+
+  // Update the title bar
+  const titleEl = document.getElementById('inv-detail-title');
+  if (titleEl) {
+    titleEl.innerHTML = `Invoice ${escapeHtml(invoice.InvoiceNumber || '—')}
+      ${isVoid ? '<span class="badge badge-void" style="font-size:12px;vertical-align:middle;margin-left:8px">Void</span>' : ''}`;
+  }
+
+  container.innerHTML = `
+    <div class="invoice-card">
+      <div style="display:flex;gap:24px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#888;margin-bottom:6px">Bill To</div>
+          <div style="font-size:13px;line-height:1.8">${addrLines || '<em style="color:#aaa">No customer info</em>'}</div>
+        </div>
+        <div style="min-width:180px;">
+          <table style="font-size:13px;border-collapse:collapse;width:100%">
+            <tr>
+              <td style="color:#888;padding:2px 16px 2px 0;white-space:nowrap">Invoice #</td>
+              <td><strong>${escapeHtml(invoice.InvoiceNumber || '—')}</strong></td>
+            </tr>
+            <tr>
+              <td style="color:#888;padding:2px 16px 2px 0">Date</td>
+              <td>${formatDate(invoice.Date)}</td>
+            </tr>
+            <tr>
+              <td style="color:#888;padding:2px 16px 2px 0">Status</td>
+              <td><span class="badge ${isVoid ? 'badge-void' : 'badge-active'}">${escapeHtml(invoice.Status || '—')}</span></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="invoice-card">
+      <div class="invoice-card-title">Line Items</div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Chemical</th>
+            <th>Size</th>
+            <th style="text-align:right">Qty</th>
+            <th style="text-align:right">Unit Price</th>
+            <th style="text-align:right">Line Total</th>
+          </tr>
+        </thead>
+        <tbody>${lineRows || '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:14px">No line items</td></tr>'}</tbody>
+      </table>
+      <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+        <div style="text-align:right;min-width:200px;padding:12px 16px;background:#eaf3e4;border-radius:8px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#4A7C2F;margin-bottom:4px">Grand Total</div>
+          <div style="font-size:26px;font-weight:700;color:#2D5016">${formatCurrency(grandTotal)}</div>
+          <div style="font-size:11px;color:#aaa;margin-top:2px">Due on Receipt &middot; No tax</div>
+        </div>
+      </div>
+    </div>
+
+    ${invoice.Notes ? `<div class="invoice-card" style="padding:14px 24px">
+      <span style="font-size:12px;font-weight:700;color:#888">Notes: </span>
+      <span style="font-size:13px;color:#555">${escapeHtml(invoice.Notes)}</span>
+    </div>` : ''}
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;">
+      <button class="btn btn-primary"
+              onclick="viewAndPrintInvoice('${escapeHtml(invoice.ID)}')">&#128424; Print Invoice</button>
+      ${!isVoid ? `<button class="btn btn-danger"
+              onclick="voidInvoice('${escapeHtml(invoice.ID)}')">Void Invoice</button>` : ''}
+    </div>`;
+}
+
+function voidInvoice(invoiceId) {
+  const inv = (_invoices || []).find(i => i.ID === invoiceId);
+  if (!inv) { showToast('Invoice not found.', 'error'); return; }
+
+  openModal(
+    'Void Invoice',
+    `<div style="margin-bottom:16px;padding:12px 14px;background:#fff5f5;border-left:4px solid #c0392b;border-radius:4px;">
+       <p style="font-weight:600;color:#c0392b;margin-bottom:4px">This action cannot be undone.</p>
+       <p style="font-size:13px;color:#555;line-height:1.6;">
+         Voiding invoice <strong>${escapeHtml(inv.InvoiceNumber || '—')}</strong> will restore all
+         inventory quantities that were deducted when the invoice was created.
+         The invoice will remain visible with a Void status.
+       </p>
+     </div>
+     <div class="form-group">
+       <label class="form-label">Reason for Voiding <span class="req">*</span></label>
+       <textarea id="void-reason" class="form-control" rows="3"
+                 placeholder="Enter a reason for voiding this invoice&hellip;"></textarea>
+     </div>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-danger" onclick="performVoid('${escapeHtml(invoiceId)}')">Void Invoice</button>`
+  );
+  setTimeout(() => document.getElementById('void-reason')?.focus(), 80);
+}
+
+async function performVoid(invoiceId) {
+  const reasonEl = document.getElementById('void-reason');
+  const reason   = reasonEl?.value.trim() || '';
+  if (!reason) {
+    reasonEl?.classList.add('is-error');
+    showToast('Please enter a reason for voiding.', 'warning');
+    return;
+  }
+
+  const btn = document.querySelector('#modal-footer .btn-danger');
+  if (btn) { btn.disabled = true; btn.textContent = 'Voiding…'; }
+
+  try {
+    // Load fresh data for accuracy
+    const [allLines, allLedger, freshPurchases] = await Promise.all([
+      loadSheetData('InvoiceLines'),
+      loadSheetData('FIFOLedger'),
+      loadSheetData('Purchases'),
+    ]);
+
+    const inv = (_invoices || []).find(i => i.ID === invoiceId);
+    if (!inv) throw new Error('Invoice not found.');
+
+    // Find all InvoiceLine IDs for this invoice
+    const lines   = allLines.filter(l => l.InvoiceID === invoiceId);
+    const lineIds = new Set(lines.map(l => l.ID));
+
+    // Find FIFOLedger rows for those lines
+    const ledgerRows = allLedger.filter(r => lineIds.has(r.InvoiceLineID));
+
+    // Aggregate qty to restore per Purchase lot
+    const restoreMap = new Map(); // purchaseLotID → qty to add back
+    for (const lr of ledgerRows) {
+      restoreMap.set(lr.PurchaseLotID,
+        (restoreMap.get(lr.PurchaseLotID) || 0) + (parseFloat(lr.QtyConsumed) || 0)
+      );
+    }
+
+    // Build batch updates for Purchases (column H = RemainingQty)
+    const purchaseMap  = new Map(freshPurchases.map(p => [p.ID, p]));
+    const purchUpdates = [];
+    for (const [purchId, addBack] of restoreMap) {
+      const p = purchaseMap.get(purchId);
+      if (!p) continue;
+      const newQty = (parseFloat(p.RemainingQty) || 0) + addBack;
+      purchUpdates.push({ range: `Purchases!H${p._row}`, values: [[String(newQty)]] });
+    }
+
+    // Update Invoice: set Status = 'Void', append reason to Notes
+    const newNotes = [inv.Notes, `VOIDED: ${reason}`].filter(Boolean).join(' | ');
+    await updateSheetRow('Invoices', inv._row, {
+      ID: inv.ID, InvoiceNumber: inv.InvoiceNumber, Date: inv.Date,
+      CustomerID: inv.CustomerID, GrandTotal: inv.GrandTotal,
+      Status: 'Void', Notes: newNotes,
+      CreatedBy: inv.CreatedBy, CreatedAt: inv.CreatedAt,
+    });
+
+    // Restore purchase quantities (batch)
+    if (purchUpdates.length > 0) await batchUpdateValues(purchUpdates);
+
+    // Refresh caches
+    [_invoices, _purchases] = await Promise.all([
+      loadSheetData('Invoices'),
+      loadSheetData('Purchases'),
+    ]);
+
+    closeModal();
+    showToast('Invoice voided and inventory restored.', 'success');
+
+    // Update the detail view to show Void status
+    const updatedInv = _invoices.find(i => i.ID === invoiceId);
+    if (updatedInv) {
+      const customer = (_customers || []).find(c => c.ID === updatedInv.CustomerID);
+      renderInvoiceDetail(updatedInv, customer, lines);
+    }
+
+  } catch (err) {
+    showToast('Error voiding invoice: ' + err.message, 'error');
+    console.error(err);
+    if (btn) { btn.disabled = false; btn.textContent = 'Void Invoice'; }
+  }
+}
+
+/* ===========================================================
+   PHASE 4 — PART C: SETTINGS — GENERAL / LOW STOCK THRESHOLD
+   =========================================================== */
+
+async function loadGeneralSettings() {
+  try {
+    _settings = await loadSheetData('Settings');
+    _lowStockThreshold = parseInt(
+      (_settings || []).find(r => r.Key === 'LowStockThreshold')?.Value || '10'
+    ) || 10;
+    const input = document.getElementById('setting-threshold');
+    if (input) input.value = String(_lowStockThreshold);
+  } catch (err) {
+    console.warn('Failed to load general settings:', err.message);
+  }
+}
+
+async function saveThreshold() {
+  const input = document.getElementById('setting-threshold');
+  const val   = parseInt(input?.value) || 0;
+  if (val < 1) {
+    input?.classList.add('is-error');
+    showToast('Threshold must be at least 1.', 'warning');
+    return;
+  }
+  input?.classList.remove('is-error');
+
+  setLoading(true, 'Saving setting…');
+  try {
+    await ensureSheetsInitialized();
+    const fresh    = await loadSheetData('Settings');
+    const existing = fresh.find(r => r.Key === 'LowStockThreshold');
+    if (existing) {
+      await updateSheetRow('Settings', existing._row, { Key: 'LowStockThreshold', Value: String(val) });
+    } else {
+      await appendSheetRow('Settings', { Key: 'LowStockThreshold', Value: String(val) });
+    }
+    _settings          = null;
+    _lowStockThreshold = val;
+    showToast('Low stock threshold saved.', 'success');
+  } catch (err) {
+    showToast('Error saving setting: ' + err.message, 'error');
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+}
+
+/* ===========================================================
+   PHASE 4 — PART D: INVENTORY FILTER TOGGLE
+   =========================================================== */
+
+function setInventoryFilter(filter) {
+  _invStockFilter = filter;
+  ['all', 'low', 'zero'].forEach(f => {
+    document.getElementById(`inv-filter-${f}`)?.classList.toggle('active', f === filter);
+  });
+  renderInventoryTable();
+}
+
+/* ===========================================================
+   PHASE 4 — PART E: CUSTOMER PURCHASE HISTORY
+   =========================================================== */
+
+function renderCustomerInvoiceHistory(customerId) {
+  const container = document.getElementById('cust-invoice-list');
+  if (!container) return;
+
+  const custInvoices = (_invoices || [])
+    .filter(i => i.CustomerID === customerId)
+    .sort((a, b) => (b.InvoiceNumber || '').localeCompare(a.InvoiceNumber || ''));
+
+  if (custInvoices.length === 0) {
+    container.innerHTML = '<p style="font-size:13px;color:#aaa">No invoices for this customer.</p>';
+    return;
+  }
+
+  const rows = custInvoices.map(inv => {
+    const isVoid = inv.Status === 'Void';
+    return `<tr style="cursor:pointer" onclick="goToInvoiceDetail('${escapeHtml(inv.ID)}')">
+      <td><strong style="color:#2D5016">${escapeHtml(inv.InvoiceNumber || '—')}</strong></td>
+      <td>${formatDate(inv.Date)}</td>
+      <td style="text-align:right">${formatCurrency(parseFloat(inv.GrandTotal) || 0)}</td>
+      <td><span class="badge ${isVoid ? 'badge-void' : 'badge-active'}">${escapeHtml(inv.Status || '—')}</span></td>
+    </tr>`;
+  }).join('');
+
+  container.innerHTML = `
+    <table class="data-table">
+      <thead><tr>
+        <th>Invoice #</th><th>Date</th>
+        <th style="text-align:right">Total</th><th>Status</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 /* ===========================================================
