@@ -1022,8 +1022,7 @@
 <!-- ============================================================
      MODAL (reusable form dialog)
      ============================================================ -->
-<div id="modal-overlay" class="modal-overlay" style="display:none"
-     onclick="closeModalOnOverlay(event)">
+<div id="modal-overlay" class="modal-overlay" style="display:none">
   <div class="modal" id="modal-box" onclick="event.stopPropagation()">
     <div class="modal-header">
       <h3 id="modal-title">Dialog</h3>
@@ -1276,11 +1275,13 @@ async function loadSheetData(tabName) {
   if (rows.length <= 1) return []; // empty or header-only
 
   const headers = rows[0];
-  return rows.slice(1).map((row, i) => {
-    const obj = { _row: i + 2 }; // +1 for header row, +1 for 1-indexing
-    headers.forEach((h, j) => { obj[h] = row[j] !== undefined ? row[j] : ''; });
-    return obj;
-  });
+  return rows.slice(1)
+    .map((row, i) => {
+      const obj = { _row: i + 2 }; // +1 for header row, +1 for 1-indexing
+      headers.forEach((h, j) => { obj[h] = row[j] !== undefined ? row[j] : ''; });
+      return obj;
+    })
+    .filter(obj => obj.ID !== '__DELETED__');
 }
 
 /** Append a single typed-object row to a tab using the tab's header order. */
@@ -1991,6 +1992,12 @@ function renderPurchasesHistory() {
       <td style="text-align:right" class="${remClass}">${formatNumber(rem)}</td>
       <td style="font-size:11px;color:#999">${escapeHtml(p.Notes || '—')}</td>
       <td style="font-size:11px;color:#999">${escapeHtml(p.CreatedBy || '—')}</td>
+      <td style="text-align:center;white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:11px"
+                onclick="openEditPurchaseForm('${escapeHtml(p.ID)}')">Edit</button>
+        <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:11px;color:#c0392b"
+                onclick="deletePurchase('${escapeHtml(p.ID)}')">Delete</button>
+      </td>
     </tr>`;
   }).join('');
 
@@ -2008,6 +2015,7 @@ function renderPurchasesHistory() {
           <th style="text-align:right">Remaining</th>
           <th>Notes</th>
           <th>Logged By</th>
+          <th style="text-align:center">Actions</th>
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>
@@ -2244,6 +2252,224 @@ async function savePurchaseForm() {
     showToast('Error saving purchase: ' + err.message, 'error');
     if (btn) { btn.disabled = false; btn.textContent = 'Log Purchase'; }
   }
+}
+
+/** Open the edit modal pre-filled with an existing purchase. */
+function openEditPurchaseForm(id) {
+  const p = (_purchases || []).find(p => p.ID === id);
+  if (!p) { showToast('Purchase not found.', 'error'); return; }
+
+  const consumed = parseFloat(p.QtyPurchased) - parseFloat(p.RemainingQty);
+  const hasConsumed = consumed > 0.0001;
+
+  const chemOpts = (_chemicals || [])
+    .map(c => `<option value="${escapeHtml(c.ID)}" data-size="${escapeHtml(c.DefaultSizeUnit || '')}"${c.ID === p.ChemicalID ? ' selected' : ''}>${escapeHtml(c.Name)}</option>`)
+    .join('');
+  const vendOpts = (_vendors || [])
+    .map(v => `<option value="${escapeHtml(v.ID)}"${v.ID === p.VendorID ? ' selected' : ''}>${escapeHtml(v.VendorName)}</option>`)
+    .join('');
+  const sizeOpts = buildSizeUnitOptions(p.SizeUnit || '');
+
+  const warningHtml = hasConsumed ? `
+    <div style="background:#fff8e1;border:1px solid #f9a825;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#7a5c00">
+      ⚠️ <strong>${formatNumber(consumed)} units</strong> from this lot have already been consumed by invoices.
+      You can edit notes and cost, but <strong>quantity cannot be reduced below ${formatNumber(parseFloat(p.QtyPurchased) - consumed + parseFloat(p.RemainingQty))}</strong> to protect FIFO integrity.
+    </div>` : '';
+
+  openModal(
+    'Edit Purchase',
+    `<form id="epf-form" onsubmit="return false">
+      <input type="hidden" id="epf-id"  value="${escapeHtml(p.ID)}">
+      <input type="hidden" id="epf-row" value="${p._row}">
+      <input type="hidden" id="epf-original-qty" value="${escapeHtml(p.QtyPurchased)}">
+      <input type="hidden" id="epf-remaining-qty" value="${escapeHtml(p.RemainingQty)}">
+      ${warningHtml}
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Date <span class="req">*</span></label>
+          <input type="date" id="epf-date" class="form-control" value="${escapeHtml(p.Date || '')}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Vendor <span class="req">*</span></label>
+          <select id="epf-vendor" class="form-control">
+            <option value="">— Select vendor —</option>
+            ${vendOpts}
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Chemical <span class="req">*</span></label>
+        <select id="epf-chemical" class="form-control"${hasConsumed ? ' disabled title="Cannot change chemical on a partially consumed lot"' : ''}>
+          <option value="">— Select chemical —</option>
+          ${chemOpts}
+        </select>
+        ${hasConsumed ? '<p class="form-hint" style="color:#c0392b">Chemical cannot be changed after inventory has been consumed.</p>' : ''}
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Size Unit <span class="req">*</span></label>
+          <select id="epf-size" class="form-control"${hasConsumed ? ' disabled' : ''}>
+            <option value="">— Select —</option>
+            ${sizeOpts}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Quantity <span class="req">*</span></label>
+          <input type="number" id="epf-qty" class="form-control"
+                 min="${hasConsumed ? (parseFloat(p.QtyPurchased) - consumed).toFixed(4) : '0.001'}"
+                 step="any" value="${escapeHtml(p.QtyPurchased)}"
+                 oninput="updateEditPurchaseTotal()"
+                 ${hasConsumed ? `title="Minimum quantity is ${formatNumber(parseFloat(p.QtyPurchased) - consumed)} (already consumed)"` : ''}>
+          ${hasConsumed ? `<p class="form-hint" style="color:#c0392b">Min: ${formatNumber(parseFloat(p.QtyPurchased) - consumed)} (consumed portion locked)</p>` : ''}
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Cost Per Unit <span class="req">*</span></label>
+        <div class="input-prefix-group">
+          <span class="input-prefix">$</span>
+          <input type="number" id="epf-cost" class="form-control"
+                 min="0" step="0.0001" value="${escapeHtml(p.CostPerUnit || '')}"
+                 oninput="updateEditPurchaseTotal()">
+        </div>
+      </div>
+      <div id="epf-total-preview" class="total-preview" style="display:block">
+        Total Cost: <span id="epf-total-value">${formatCurrency(parseFloat(p.QtyPurchased) * parseFloat(p.CostPerUnit))}</span>
+      </div>
+      <div class="form-group" style="margin-top:14px">
+        <label class="form-label">Notes</label>
+        <input type="text" id="epf-notes" class="form-control" value="${escapeHtml(p.Notes || '')}"
+               placeholder="Optional notes">
+      </div>
+    </form>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-primary"   onclick="saveEditPurchaseForm()">Save Changes</button>`
+  );
+}
+
+function updateEditPurchaseTotal() {
+  const qty  = parseFloat(document.getElementById('epf-qty')?.value  || 0);
+  const cost = parseFloat(document.getElementById('epf-cost')?.value || 0);
+  const valEl = document.getElementById('epf-total-value');
+  const preview = document.getElementById('epf-total-preview');
+  if (qty > 0 && cost > 0) {
+    if (valEl) valEl.textContent = formatCurrency(qty * cost);
+    if (preview) preview.style.display = 'block';
+  } else {
+    if (preview) preview.style.display = 'none';
+  }
+}
+
+async function saveEditPurchaseForm() {
+  const id          = document.getElementById('epf-id').value;
+  const rowStr      = document.getElementById('epf-row').value;
+  const origQty     = parseFloat(document.getElementById('epf-original-qty').value) || 0;
+  const remainingQty= parseFloat(document.getElementById('epf-remaining-qty').value) || 0;
+  const consumed    = origQty - remainingQty;
+
+  const p = (_purchases || []).find(p => p.ID === id);
+  if (!p) { showToast('Purchase not found.', 'error'); return; }
+
+  const date   = document.getElementById('epf-date').value;
+  const vendId = document.getElementById('epf-vendor').value;
+  // If chemical was disabled (consumed lot), keep original value
+  const chemEl = document.getElementById('epf-chemical');
+  const chemId = chemEl.disabled ? p.ChemicalID : chemEl.value;
+  const sizeEl = document.getElementById('epf-size');
+  const size   = sizeEl.disabled ? p.SizeUnit : sizeEl.value;
+  const newQty = parseFloat(document.getElementById('epf-qty').value);
+  const cost   = document.getElementById('epf-cost').value.trim();
+  const notes  = document.getElementById('epf-notes').value.trim();
+
+  let valid = true;
+  const mark = (id, ok) => { document.getElementById(id)?.classList.toggle('is-error', !ok); if (!ok) valid = false; };
+  mark('epf-date',   !!date);
+  mark('epf-vendor', !!vendId);
+  mark('epf-cost',   !!cost && parseFloat(cost) >= 0);
+
+  if (!valid) { showToast('Please fill in all required fields.', 'warning'); return; }
+
+  // Validate qty is not less than consumed amount
+  if (newQty < consumed - 0.0001) {
+    showToast(`Quantity cannot be less than ${formatNumber(consumed)} (already consumed by invoices).`, 'error');
+    return;
+  }
+
+  // Recalculate RemainingQty: newQty - consumed
+  const newRemaining = newQty - consumed;
+
+  const updated = {
+    ID:           id,
+    Date:         date,
+    VendorID:     vendId,
+    ChemicalID:   chemId,
+    SizeUnit:     size,
+    QtyPurchased: String(newQty),
+    CostPerUnit:  parseFloat(cost).toFixed(4),
+    RemainingQty: String(Math.max(0, newRemaining)),
+    Notes:        notes,
+    CreatedBy:    p.CreatedBy || '',
+    CreatedAt:    p.CreatedAt || '',
+  };
+
+  const btn = document.querySelector('#modal-footer .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+  try {
+    await updateSheetRow('Purchases', parseInt(rowStr), updated);
+    closeModal();
+    showToast('Purchase updated.', 'success');
+    _purchases = await loadSheetData('Purchases');
+    populatePurchaseFilters();
+    renderPurchasesHistory();
+  } catch (err) {
+    showToast('Error saving purchase: ' + err.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
+  }
+}
+
+/** Delete a purchase lot. Blocked if any inventory has been consumed from it. */
+function deletePurchase(id) {
+  const p = (_purchases || []).find(p => p.ID === id);
+  if (!p) { showToast('Purchase not found.', 'error'); return; }
+
+  const consumed = parseFloat(p.QtyPurchased) - parseFloat(p.RemainingQty);
+  if (consumed > 0.0001) {
+    const chemMap = buildIdMap(_chemicals || [], 'ID', 'Name');
+    openConfirm(
+      'Cannot Delete Purchase',
+      `This lot (${chemMap[p.ChemicalID] || 'Unknown'}, ${formatDate(p.Date)}) cannot be deleted because ${formatNumber(consumed)} units have already been consumed by invoices. Void those invoices first to restore the inventory.`,
+      () => {}, // no-op
+      'OK',
+      false
+    );
+    return;
+  }
+
+  const chemMap = buildIdMap(_chemicals || [], 'ID', 'Name');
+  const vendMap = buildIdMap(_vendors   || [], 'ID', 'VendorName');
+  openConfirm(
+    'Delete Purchase',
+    `Delete the purchase of ${formatNumber(parseFloat(p.QtyPurchased))} × ${p.SizeUnit} ${chemMap[p.ChemicalID] || ''} from ${vendMap[p.VendorID] || ''} on ${formatDate(p.Date)}? This cannot be undone.`,
+    async () => {
+      try {
+        // Clear the row by writing empty values (Sheets API doesn't truly delete rows easily,
+        // so we mark it with a special deleted flag and filter it out on load)
+        const blank = {
+          ID: '__DELETED__', Date: '', VendorID: '', ChemicalID: '', SizeUnit: '',
+          QtyPurchased: '0', CostPerUnit: '0', RemainingQty: '0', Notes: '', CreatedBy: '', CreatedAt: ''
+        };
+        await updateSheetRow('Purchases', parseInt(p._row), blank);
+        showToast('Purchase deleted.', 'success');
+        _purchases = await loadSheetData('Purchases');
+        populatePurchaseFilters();
+        renderPurchasesHistory();
+      } catch (err) {
+        showToast('Error deleting purchase: ' + err.message, 'error');
+      }
+    },
+    'Delete',
+    true
+  );
 }
 
 /* ===========================================================
