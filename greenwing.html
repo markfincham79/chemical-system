@@ -916,6 +916,11 @@
             <div class="invoice-card-title">Step 3 &mdash; Summary &amp; Save</div>
             <div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap;">
               <div style="flex:1;min-width:220px;">
+                <div class="form-group" style="margin-bottom:14px;">
+                  <label class="form-label">Invoice Date</label>
+                  <input type="date" id="inv-date" class="form-control" style="max-width:200px;">
+                  <p class="form-hint">Defaults to today. Change if backdating is needed.</p>
+                </div>
                 <div class="form-group">
                   <label class="form-label">Invoice Notes (optional)</label>
                   <textarea id="inv-notes" class="form-control" rows="3"
@@ -1105,7 +1110,7 @@ const HEADERS = {
   Vendors:      ['ID','VendorName','Contact','Phone','Notes'],
   Purchases:    ['ID','Date','VendorID','ChemicalID','SizeUnit','QtyPurchased','CostPerUnit','RemainingQty','Notes','CreatedBy','CreatedAt'],
   Customers:    ['ID','Name','BusinessName','Address','City','State','Zip','Phone','Email','Notes'],
-  Invoices:     ['ID','InvoiceNumber','Date','CustomerID','GrandTotal','Status','Notes','CreatedBy','CreatedAt'],
+  Invoices:     ['ID','InvoiceNumber','Date','CustomerID','GrandTotal','Status','Notes','CreatedBy','CreatedAt','AmountPaid','PaidInFull'],
   InvoiceLines: ['ID','InvoiceID','ChemicalID','SizeUnit','Qty','ListPrice','SalePrice','PriceOverridden','LineTotal','FIFOCostPerUnit'],
   FIFOLedger:   ['ID','InvoiceLineID','PurchaseLotID','QtyConsumed','CostPerUnit','Date'],
   Settings:     ['Key','Value'],
@@ -3369,12 +3374,31 @@ function renderInvoicesList() {
     const biz  = custMap[inv.CustomerID]     || '';
     const name = custNameMap[inv.CustomerID] || '';
     const displayCust = biz || name || '—';
-    const isVoid = inv.Status === 'Void';
+    const isVoid     = inv.Status === 'Void';
+    const grandTotal = parseFloat(inv.GrandTotal)  || 0;
+    const amountPaid = parseFloat(inv.AmountPaid)  || 0;
+    const paidInFull = inv.PaidInFull === 'TRUE';
+    const balance    = Math.max(0, grandTotal - amountPaid);
+
+    let payBadge;
+    if (isVoid) {
+      payBadge = '';
+    } else if (paidInFull || balance <= 0) {
+      payBadge = '<span class="badge badge-active">Paid</span>';
+    } else if (amountPaid > 0) {
+      payBadge = '<span class="badge badge-void" style="background:#fff8e1;color:#92400E;border:1px solid #f9a825">Partial</span>';
+    } else {
+      payBadge = '<span class="badge" style="background:#f3f4f6;color:#6b7280">Unpaid</span>';
+    }
+
     return `<tr style="cursor:pointer" onclick="openInvoiceDetail('${escapeHtml(inv.ID)}')">
       <td><strong style="color:#2D5016">${escapeHtml(inv.InvoiceNumber || '—')}</strong></td>
       <td>${formatDate(inv.Date)}</td>
       <td>${escapeHtml(displayCust)}</td>
-      <td style="text-align:right"><strong>${formatCurrency(parseFloat(inv.GrandTotal) || 0)}</strong></td>
+      <td style="text-align:right"><strong>${formatCurrency(grandTotal)}</strong></td>
+      <td style="text-align:right">${amountPaid > 0 || paidInFull ? formatCurrency(amountPaid) : '<span style="color:#aaa">—</span>'}</td>
+      <td style="text-align:right;font-weight:600;color:${balance > 0 && !isVoid ? '#c0392b' : '#aaa'}">${!isVoid && balance > 0 ? formatCurrency(balance) : '<span style="color:#aaa">—</span>'}</td>
+      <td>${payBadge}</td>
       <td><span class="badge ${isVoid ? 'badge-void' : 'badge-active'}">${escapeHtml(inv.Status || '—')}</span></td>
       <td class="col-actions" onclick="event.stopPropagation()">
         <div class="row-actions">
@@ -3393,6 +3417,9 @@ function renderInvoicesList() {
           <th>Date</th>
           <th>Customer</th>
           <th style="text-align:right">Total</th>
+          <th style="text-align:right">Paid</th>
+          <th style="text-align:right">Balance</th>
+          <th>Payment</th>
           <th>Status</th>
           <th style="width:90px">Actions</th>
         </tr>
@@ -3429,6 +3456,14 @@ function showInvoiceBuilder() {
   // Reset notes
   const notesEl = document.getElementById('inv-notes');
   if (notesEl) notesEl.value = '';
+
+  // Reset date to today
+  const dateEl = document.getElementById('inv-date');
+  if (dateEl) dateEl.value = new Date().toISOString().split('T')[0];
+
+  // Ensure Step 3 is visible (hidden after a previous save)
+  const summaryCard = document.getElementById('inv-summary-card');
+  if (summaryCard) summaryCard.style.display = 'block';
 
   // Re-enable save button
   const saveBtn = document.getElementById('inv-save-btn');
@@ -3838,6 +3873,7 @@ async function saveInvoice() {
     const invoiceId  = generateId();
     const lineIds    = validLines.map(() => generateId());
     const today      = new Date().toISOString().split('T')[0];
+    const invoiceDate = document.getElementById('inv-date')?.value || today;
     const grandTotal = validLines.reduce((s, li) => s + (li.lineTotal || 0), 0);
     const notes      = document.getElementById('inv-notes')?.value.trim() || '';
     const createdBy  = currentUser
@@ -3846,9 +3882,10 @@ async function saveInvoice() {
     const createdAt  = new Date().toISOString();
 
     const invoiceRow = {
-      ID: invoiceId, InvoiceNumber: invoiceNumber, Date: today,
+      ID: invoiceId, InvoiceNumber: invoiceNumber, Date: invoiceDate,
       CustomerID: customerId, GrandTotal: grandTotal.toFixed(2),
       Status: 'Active', Notes: notes, CreatedBy: createdBy, CreatedAt: createdAt,
+      AmountPaid: '0', PaidInFull: 'FALSE',
     };
 
     const invoiceLineRows = validLines.map((li, i) => ({
@@ -4370,17 +4407,34 @@ function renderInvoiceDetail(invoice, customer, lines) {
       <span style="font-size:13px;color:#555">${escapeHtml(invoice.Notes)}</span>
     </div>` : ''}
 
+    ${!isVoid ? (() => {
+      const grand      = parseFloat(invoice.GrandTotal) || 0;
+      const paid       = parseFloat(invoice.AmountPaid) || 0;
+      const paidInFull = invoice.PaidInFull === 'TRUE';
+      const balance    = Math.max(0, grand - paid);
+      const balColor   = balance > 0 ? '#c0392b' : '#27ae60';
+      return `<div class="invoice-card" style="padding:16px 24px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#888;margin-bottom:10px">Payment Status</div>
+        <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:center">
+          <div><div style="font-size:11px;color:#888;margin-bottom:2px">Invoice Total</div><div style="font-size:18px;font-weight:700;color:#2D5016">${formatCurrency(grand)}</div></div>
+          <div><div style="font-size:11px;color:#888;margin-bottom:2px">Amount Paid</div><div style="font-size:18px;font-weight:700;color:#27ae60">${formatCurrency(paid)}</div></div>
+          <div><div style="font-size:11px;color:#888;margin-bottom:2px">Balance Due</div><div style="font-size:18px;font-weight:700;color:${balColor}">${formatCurrency(balance)}</div></div>
+          <div><div style="font-size:11px;color:#888;margin-bottom:2px">Paid in Full</div><div style="font-size:15px;font-weight:700;color:${paidInFull ? '#27ae60' : '#aaa'}">${paidInFull ? '✓ Yes' : '—'}</div></div>
+        </div>
+      </div>`;
+    })() : ''}
+
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;">
       <button class="btn btn-primary"
               onclick="viewAndPrintInvoice('${escapeHtml(invoice.ID)}')">&#128424; Print Invoice</button>
       ${!isVoid ? `<button class="btn btn-secondary"
-              onclick="editInvoiceMeta('${escapeHtml(invoice.ID)}')">&#9998; Edit Date / Notes</button>` : ''}
+              onclick="editInvoiceMeta('${escapeHtml(invoice.ID)}')">&#9998; Edit Date / Notes / Payment</button>` : ''}
       ${!isVoid ? `<button class="btn btn-danger"
               onclick="voidInvoice('${escapeHtml(invoice.ID)}')">Void Invoice</button>` : ''}
     </div>`;
 }
 
-/** Edit only the safe fields on a saved invoice — date and notes.
+/** Edit safe fields on a saved invoice — date, notes, amount paid, paid-in-full.
  *  Line items, quantities, and FIFO entries are never touched. */
 function editInvoiceMeta(invoiceId) {
   const inv = (_invoices || []).find(i => i.ID === invoiceId);
@@ -4389,7 +4443,7 @@ function editInvoiceMeta(invoiceId) {
   openModal(
     `Edit Invoice ${escapeHtml(inv.InvoiceNumber || '')}`,
     `<div style="margin-bottom:16px;padding:10px 14px;background:#eaf3e4;border-left:4px solid #4A7C2F;border-radius:4px;font-size:13px;color:#2D5016;">
-       Only the invoice date and notes can be edited here. Line items and inventory are not affected.
+       Only the date, payment, and notes can be edited here. Line items and inventory are not affected.
      </div>
      <input type="hidden" id="eim-id"  value="${escapeHtml(inv.ID)}">
      <input type="hidden" id="eim-row" value="${inv._row}">
@@ -4397,6 +4451,24 @@ function editInvoiceMeta(invoiceId) {
        <label class="form-label">Invoice Date <span class="req">*</span></label>
        <input type="date" id="eim-date" class="form-control" style="max-width:200px"
               value="${escapeHtml(inv.Date || '')}">
+     </div>
+     <div class="form-group" style="margin-bottom:14px">
+       <label class="form-label">Amount Paid</label>
+       <div class="input-prefix-group" style="max-width:200px">
+         <span class="input-prefix">$</span>
+         <input type="number" id="eim-amount-paid" class="form-control"
+                min="0" step="0.01" placeholder="0.00"
+                value="${escapeHtml(String(parseFloat(inv.AmountPaid) || 0))}">
+       </div>
+       <p class="form-hint">Invoice Total: ${formatCurrency(parseFloat(inv.GrandTotal) || 0)}</p>
+     </div>
+     <div class="form-group" style="margin-bottom:14px">
+       <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+         <input type="checkbox" id="eim-paid-full" style="width:16px;height:16px;cursor:pointer"
+                ${inv.PaidInFull === 'TRUE' ? 'checked' : ''}>
+         Paid in Full
+       </label>
+       <p class="form-hint">Check when the invoice has been completely paid.</p>
      </div>
      <div class="form-group">
        <label class="form-label">Notes</label>
@@ -4409,10 +4481,12 @@ function editInvoiceMeta(invoiceId) {
 }
 
 async function saveInvoiceMeta() {
-  const id     = document.getElementById('eim-id').value;
-  const rowStr = document.getElementById('eim-row').value;
-  const date   = document.getElementById('eim-date').value;
-  const notes  = document.getElementById('eim-notes').value.trim();
+  const id         = document.getElementById('eim-id').value;
+  const rowStr     = document.getElementById('eim-row').value;
+  const date       = document.getElementById('eim-date').value;
+  const amountPaid = document.getElementById('eim-amount-paid').value.trim();
+  const paidInFull = document.getElementById('eim-paid-full').checked;
+  const notes      = document.getElementById('eim-notes').value.trim();
 
   if (!date) {
     document.getElementById('eim-date').classList.add('is-error');
@@ -4427,7 +4501,13 @@ async function saveInvoiceMeta() {
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
 
   try {
-    const updated = { ...inv, Date: date, Notes: notes };
+    const updated = {
+      ...inv,
+      Date:       date,
+      Notes:      notes,
+      AmountPaid: String(parseFloat(amountPaid) || 0),
+      PaidInFull: paidInFull ? 'TRUE' : 'FALSE',
+    };
     delete updated._row;
     await updateSheetRow('Invoices', parseInt(rowStr), updated);
     closeModal();
@@ -4522,12 +4602,15 @@ async function performVoid(invoiceId) {
     }
 
     // Update Invoice: set Status = 'Void', append reason to Notes
+    // Preserve AmountPaid and PaidInFull so payment history isn't lost on void
     const newNotes = [inv.Notes, `VOIDED: ${reason}`].filter(Boolean).join(' | ');
     await updateSheetRow('Invoices', inv._row, {
       ID: inv.ID, InvoiceNumber: inv.InvoiceNumber, Date: inv.Date,
       CustomerID: inv.CustomerID, GrandTotal: inv.GrandTotal,
       Status: 'Void', Notes: newNotes,
       CreatedBy: inv.CreatedBy, CreatedAt: inv.CreatedAt,
+      AmountPaid: inv.AmountPaid || '0',
+      PaidInFull: inv.PaidInFull || 'FALSE',
     });
 
     // Restore purchase quantities (batch)
