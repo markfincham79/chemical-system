@@ -1335,6 +1335,33 @@ async function initializeSheets() {
     );
   }
 
+  // ── Column migration: add any headers that are missing from existing tabs ──
+  // This handles cases where new columns (e.g. AmountPaid, PaidInFull) were
+  // added to HEADERS after the sheet tab was already created.
+  const colMigrations = [];
+  for (const tabName of Object.keys(HEADERS)) {
+    if (missing.includes(tabName)) continue; // just created, already correct
+    try {
+      const result = await getSheetValues(tabName);
+      const existingHeaders = (result.values || [])[0] || [];
+      const expectedHeaders = HEADERS[tabName];
+      if (existingHeaders.length < expectedHeaders.length) {
+        // Write the full header row to fill in any missing columns
+        const endCol = String.fromCharCode(64 + expectedHeaders.length);
+        colMigrations.push({
+          range:  `${tabName}!A1:${endCol}1`,
+          values: [expectedHeaders],
+        });
+      }
+    } catch (e) {
+      console.warn(`Could not check headers for ${tabName}:`, e.message);
+    }
+  }
+  if (colMigrations.length > 0) {
+    await batchUpdateValues(colMigrations);
+  }
+  // ── End column migration ──
+
   // Seed SizeUnits with defaults if it is empty
   const unitsData = await loadSheetData('SizeUnits');
   if (unitsData.length === 0) {
