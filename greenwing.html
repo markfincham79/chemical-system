@@ -3794,8 +3794,9 @@ async function generateNextInvoiceNumber() {
 
 /**
  * Simulate FIFO consumption for all line items.
- * Returns array of { blendedCost, consumedLots: [{lot, qty, costPerUnit}] }
- * Throws if any line item lacks sufficient inventory.
+ * Returns { results, warnings } where results is an array of
+ * { blendedCost, consumedLots: [{lot, qty, costPerUnit}] }.
+ * If inventory is insufficient, the last lot goes negative and a warning is recorded.
  */
 function calculateFIFO(lineItems, purchases) {
   // Work on copies so we can track remaining across multiple line items
@@ -3803,23 +3804,26 @@ function calculateFIFO(lineItems, purchases) {
     ...p, _remaining: parseFloat(p.RemainingQty) || 0,
   }));
 
-  const results = [];
+  const results  = [];
+  const warnings = [];
 
   for (const lineItem of lineItems) {
     const qty    = parseFloat(lineItem.qty) || 0;
     const chemId = lineItem.chemicalId;
 
+    // Include all lots for this chemical (sorted oldest first)
     const availableLots = purchaseCopies
-      .filter(p => p.ChemicalID === chemId && p._remaining > 0.0001)
+      .filter(p => p.ChemicalID === chemId)
       .sort((a, b) => new Date(a.Date) - new Date(b.Date));
 
-    const totalAvailable = availableLots.reduce((s, l) => s + l._remaining, 0);
+    const totalAvailable = availableLots.reduce((s, l) => s + Math.max(0, l._remaining), 0);
 
+    // Warn but do not block if insufficient inventory
     if (totalAvailable < qty - 0.0001) {
       const chem = (_chemicals || []).find(c => c.ID === chemId);
-      throw new Error(
-        `Insufficient inventory for "${chem?.Name || chemId}". ` +
-        `Need ${formatNumber(qty)}, only ${formatNumber(Math.max(0, totalAvailable))} available.`
+      warnings.push(
+        '"' + (chem ? chem.Name : chemId) + '": need ' + formatNumber(qty) +
+        ', only ' + formatNumber(Math.max(0, totalAvailable)) + ' on hand \u2014 inventory will go negative.'
       );
     }
 
@@ -3827,8 +3831,10 @@ function calculateFIFO(lineItems, purchases) {
     let totalCost = 0;
     const consumedLots = [];
 
+    // Drain available lots normally
     for (const lot of availableLots) {
       if (remaining <= 0.0001) break;
+      if (lot._remaining <= 0.0001) continue;
       const consume     = Math.min(remaining, lot._remaining);
       const costPerUnit = parseFloat(lot.CostPerUnit) || 0;
       consumedLots.push({ lot, qty: consume, costPerUnit });
@@ -3837,13 +3843,26 @@ function calculateFIFO(lineItems, purchases) {
       remaining       -= consume;
     }
 
+    // If still remaining after all lots, push the overage onto the most recent lot
+    // (driving it negative so RemainingQty in the sheet goes negative)
+    if (remaining > 0.0001) {
+      const lastLot = availableLots[availableLots.length - 1];
+      if (lastLot) {
+        const costPerUnit = parseFloat(lastLot.CostPerUnit) || 0;
+        consumedLots.push({ lot: lastLot, qty: remaining, costPerUnit });
+        totalCost          += remaining * costPerUnit;
+        lastLot._remaining -= remaining;
+        remaining           = 0;
+      }
+    }
+
     results.push({
       blendedCost:  qty > 0 ? totalCost / qty : 0,
       consumedLots,
     });
   }
 
-  return results;
+  return { results, warnings };
 }
 
 /* ----- Save Invoice ----- */
@@ -3885,15 +3904,10 @@ async function saveInvoice() {
     setLoading(true, 'Checking inventory…');
     const freshPurchases = await loadSheetData('Purchases');
 
-    // Step 3 — Run FIFO simulation (validates inventory, aborts if insufficient)
-    let fifoResults;
-    try {
-      fifoResults = calculateFIFO(validLines, freshPurchases);
-    } catch (fifoErr) {
-      setLoading(false);
-      showToast(fifoErr.message, 'error');
-      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Invoice'; }
-      return;
+    // Step 3 — Run FIFO simulation (warns if insufficient, but does not abort)
+    const { results: fifoResults, warnings: fifoWarnings } = calculateFIFO(validLines, freshPurchases);
+    if (fifoWarnings.length > 0) {
+      fifoWarnings.forEach(w => showToast('Low inventory: ' + w, 'warning'));
     }
 
     // Step 4 — Build all rows with pre-generated IDs
@@ -3950,7 +3964,7 @@ async function saveInvoice() {
     for (const [, lot] of lotUpdateMap) {
       purchaseUpdates.push({
         range:  `Purchases!H${lot._row}`,
-        values: [[String(Math.max(0, lot._remaining))]],
+        values: [[String(lot._remaining)]],
       });
     }
 
