@@ -1,0 +1,4827 @@
+<!--
+  ============================================================
+  GREENWING AG — SEED TRACKING SYSTEM
+  Operator Reference (read this before making changes)
+  ============================================================
+
+  GOOGLE SHEET
+    Sheet ID : 1N1XYHAP2CGlKdrqnRHcVdKm2TQ3tiTjfu-Sv8hbsjfU
+    URL      : https://docs.google.com/spreadsheets/d/1N1XYHAP2CGlKdrqnRHcVdKm2TQ3tiTjfu-Sv8hbsjfU
+
+  TABS OWNED BY THIS APP (do not rename or delete)
+    CropYears, SeedCatalog, SeedLots, SeedOrders,
+    SeedOrderLines, SeedPayments, SeedCommissions, SeedSalespeople
+
+  SHARED TABS (also used by greenwing.html — read-only here)
+    Customers, Vendors
+
+  OAUTH CLIENT
+    Project  : Google Cloud Console → "chemical-system" project
+    Client ID: 340528542311-ld56h96a09377h85oto7rlhl1cci03gf.apps.googleusercontent.com
+    Authorized origins must include the GitHub Pages domain:
+      https://markfincham79.github.io
+    If OAuth fails after moving domains, add the new origin at:
+      console.cloud.google.com → APIs & Services → Credentials
+
+  HOW TO ADD A NEW CROP YEAR
+    1. Sign in and click "Settings" in the left sidebar.
+    2. Under "Crop Years", type the new year label (e.g. "2027") and click Add.
+    3. The year becomes available in the crop-year selector at the top of the sidebar.
+
+  HOW TO ADD A SALESPERSON
+    1. Sign in and click "Settings" in the left sidebar.
+    2. Under "Salespeople", type the name and click Add.
+    3. To deactivate a salesperson, click Deactivate next to their name.
+
+  DEPLOYMENT
+    Hosted  : https://markfincham79.github.io/chemical-system/seed.html
+    Branch  : main
+    Deploy  : push to main → GitHub Pages rebuilds automatically (~1 min)
+
+  Contact: Matt@greenwing.ag | 785-562-6874
+  ============================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Greenwing Ag — Seed Tracking</title>
+  <style>
+    /* ==============================================
+       RESET & BASE
+       ============================================== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, system-ui, sans-serif;
+      font-size: 14px;
+      color: #333;
+      background: #F5F5F5;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ==============================================
+       LOGIN SCREEN
+       ============================================== */
+    #login-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: linear-gradient(150deg, #1e3a0e 0%, #2D5016 50%, #4A7C2F 100%);
+    }
+    .login-card {
+      background: white;
+      border-radius: 10px;
+      padding: 52px 44px 44px;
+      text-align: center;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.3);
+      width: 380px;
+    }
+    .login-card h1 {
+      font-size: 26px;
+      color: #2D5016;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      margin-bottom: 4px;
+    }
+    .login-card .login-subtitle { color: #666; font-size: 13px; margin-bottom: 36px; }
+    .login-divider { border: none; border-top: 1px solid #eee; margin: 0 0 28px; }
+    .btn-google {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      padding: 13px 20px;
+      border: 1.5px solid #dadce0;
+      border-radius: 6px;
+      background: white;
+      color: #3c4043;
+      font-size: 15px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+    .btn-google:hover { background: #f8f9fa; box-shadow: 0 1px 6px rgba(0,0,0,0.12); }
+    .btn-google:disabled { opacity: 0.6; cursor: not-allowed; }
+    .login-footer { margin-top: 24px; font-size: 11px; color: #aaa; line-height: 1.6; }
+
+    /* ==============================================
+       APP SHELL
+       ============================================== */
+    #app-shell { display: none; flex-direction: column; height: 100vh; }
+
+    /* Header */
+    .app-header {
+      background: #2D5016;
+      color: white;
+      height: 54px;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      z-index: 200;
+    }
+    .header-brand { display: flex; align-items: center; gap: 10px; flex: 1; }
+    .header-brand-name { font-size: 17px; font-weight: 700; letter-spacing: 0.2px; }
+    .header-brand-sep { opacity: 0.35; font-size: 18px; }
+    .header-brand-sub { font-size: 13px; opacity: 0.7; font-weight: 400; }
+    .header-user { display: flex; align-items: center; gap: 10px; }
+    .header-user-avatar {
+      width: 30px; height: 30px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.35); object-fit: cover;
+    }
+    .header-user-avatar-placeholder {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      border: 2px solid rgba(255,255,255,0.35);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: white; flex-shrink: 0;
+    }
+    .header-user-name { font-size: 13px; opacity: 0.9; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .btn-signout {
+      background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25);
+      color: rgba(255,255,255,0.85); padding: 5px 12px; border-radius: 4px;
+      cursor: pointer; font-size: 12px; font-family: inherit; transition: background 0.15s;
+    }
+    .btn-signout:hover { background: rgba(255,255,255,0.22); }
+
+    /* Body layout */
+    .app-body { display: flex; flex: 1; overflow: hidden; }
+
+    /* Sidebar */
+    .sidebar {
+      width: 204px; background: #1a3309; flex-shrink: 0;
+      display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden;
+    }
+
+    /* Crop Year Picker */
+    .sidebar-year-picker {
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      flex-shrink: 0;
+    }
+    .sidebar-year-label {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 1.4px;
+      color: rgba(255,255,255,0.4); margin-bottom: 6px;
+    }
+    .sidebar-year-select {
+      width: 100%;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.22);
+      border-radius: 4px;
+      color: white;
+      padding: 7px 28px 7px 9px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.5)' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+    }
+    .sidebar-year-select:focus { outline: none; border-color: rgba(255,255,255,0.45); }
+    .sidebar-year-select option { background: #1a3309; color: white; }
+
+    .sidebar-nav { padding: 10px 0; flex: 1; list-style: none; }
+    .nav-section-label {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 1.4px;
+      color: rgba(255,255,255,0.35); padding: 14px 18px 5px;
+    }
+    .nav-link {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 18px; color: rgba(255,255,255,0.68);
+      text-decoration: none; font-size: 13px; font-weight: 500;
+      border-left: 3px solid transparent;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+      cursor: pointer; user-select: none;
+    }
+    .nav-link:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.9); }
+    .nav-link.active { background: rgba(74,124,47,0.35); color: white; border-left-color: #8CC152; }
+    .nav-icon { width: 20px; text-align: center; font-style: normal; flex-shrink: 0; opacity: 0.85; }
+    .nav-link.active .nav-icon { opacity: 1; }
+    .sidebar-footer { padding: 12px 18px; border-top: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; }
+    .conn-status { display: flex; align-items: center; gap: 7px; font-size: 11px; color: rgba(255,255,255,0.45); }
+    .sidebar-about { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); }
+    .sidebar-about-name { font-size: 11px; color: rgba(255,255,255,0.35); font-weight: 600; letter-spacing: 0.2px; }
+    .sidebar-about-sub  { font-size: 10px; color: rgba(255,255,255,0.22); margin-top: 2px; letter-spacing: 0.2px; }
+    .conn-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: #666; }
+    .conn-dot.checking  { background: #E8A838; animation: blink 1.1s ease-in-out infinite; }
+    .conn-dot.connected { background: #8CC152; }
+    .conn-dot.error     { background: #e74c3c; }
+    @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.25; } }
+
+    /* Content */
+    .content { flex: 1; overflow-y: auto; padding: 28px 32px; background: #F5F5F5; }
+    .section { display: none; }
+    .section.active { display: block; }
+    .section-header {
+      margin-bottom: 20px; padding-bottom: 14px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+    .section-header h2 { font-size: 22px; color: #2D5016; font-weight: 700; }
+    .section-header p { color: #777; margin-top: 4px; font-size: 13px; }
+
+    /* Placeholder card */
+    .placeholder-card {
+      background: white; border-radius: 8px; padding: 52px 40px;
+      text-align: center; border: 2px dashed #dce0dc;
+    }
+    .placeholder-card .placeholder-icon { font-size: 36px; margin-bottom: 14px; opacity: 0.4; }
+    .placeholder-card h3 { font-size: 15px; color: #555; font-weight: 600; margin-bottom: 8px; }
+    .placeholder-card p { font-size: 13px; color: #999; max-width: 380px; margin: 0 auto; line-height: 1.6; }
+    .placeholder-badge {
+      display: inline-block; background: #eaf3e4; color: #4A7C2F;
+      font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px;
+      margin-top: 14px; text-transform: uppercase; letter-spacing: 0.8px;
+    }
+
+    /* ==============================================
+       BUTTONS
+       ============================================== */
+    .btn {
+      padding: 7px 16px; border-radius: 5px; font-size: 13px; font-weight: 600;
+      cursor: pointer; border: none; font-family: inherit;
+      transition: background 0.15s, box-shadow 0.15s, opacity 0.15s;
+      display: inline-flex; align-items: center; gap: 6px;
+      text-decoration: none; white-space: nowrap;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+    .btn-primary { background: #4A7C2F; color: white; }
+    .btn-primary:hover:not(:disabled) { background: #3d6826; }
+    .btn-secondary { background: white; color: #444; border: 1.5px solid #ccc; }
+    .btn-secondary:hover:not(:disabled) { background: #f5f5f5; border-color: #999; }
+    .btn-danger { background: #c0392b; color: white; }
+    .btn-danger:hover:not(:disabled) { background: #a93226; }
+    .btn-warning { background: #d68910; color: white; }
+    .btn-warning:hover:not(:disabled) { background: #b9770e; }
+    .btn-ghost { background: none; color: #555; border: 1.5px solid #ddd; }
+    .btn-ghost:hover:not(:disabled) { background: #f5f5f5; border-color: #bbb; color: #333; }
+    .btn-sm { padding: 4px 11px; font-size: 12px; border-radius: 4px; }
+
+    /* ==============================================
+       TABLES
+       ============================================== */
+    .data-table {
+      width: 100%; border-collapse: collapse; background: white;
+      border-radius: 8px; overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .data-table th {
+      text-align: left; padding: 10px 14px;
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.7px; color: #555; background: #f9f9f9;
+      border-bottom: 2px solid #e8e8e8; white-space: nowrap;
+    }
+    .data-table td {
+      padding: 10px 14px; border-bottom: 1px solid #f0f0f0;
+      font-size: 13px; vertical-align: middle;
+    }
+    .data-table tbody tr:last-child td { border-bottom: none; }
+    .data-table tbody tr:hover td { background: #fafff7; }
+    .data-table .col-actions { width: 1%; white-space: nowrap; }
+    .row-actions { display: flex; gap: 5px; align-items: center; }
+
+    /* ==============================================
+       FORMS
+       ============================================== */
+    .form-group { margin-bottom: 16px; }
+    .form-group:last-child { margin-bottom: 0; }
+    .form-label { display: block; font-size: 12px; font-weight: 700; color: #444; margin-bottom: 5px; letter-spacing: 0.3px; }
+    .form-label .req { color: #c0392b; margin-left: 2px; }
+    .form-control {
+      width: 100%; padding: 8px 11px; border: 1.5px solid #d0d0d0;
+      border-radius: 5px; font-size: 13px; font-family: inherit;
+      color: #333; background: white; transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .form-control:focus { border-color: #4A7C2F; outline: none; box-shadow: 0 0 0 3px rgba(74,124,47,0.12); }
+    .form-control.is-error { border-color: #c0392b; }
+    .form-control.is-error:focus { box-shadow: 0 0 0 3px rgba(192,57,43,0.12); }
+    textarea.form-control { resize: vertical; min-height: 76px; }
+    .form-hint { font-size: 11px; color: #999; margin-top: 4px; line-height: 1.4; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    /* ==============================================
+       SUB-TABS (within sections)
+       ============================================== */
+    .sub-tabs {
+      display: flex; border-bottom: 2px solid #e0e0e0; margin-bottom: 20px;
+    }
+    .sub-tab {
+      padding: 9px 20px; font-size: 13px; font-weight: 600; color: #777;
+      background: none; border: none; cursor: pointer;
+      border-bottom: 2px solid transparent; margin-bottom: -2px;
+      font-family: inherit; transition: color 0.15s, border-color 0.15s;
+    }
+    .sub-tab:hover { color: #2D5016; }
+    .sub-tab.active { color: #2D5016; border-bottom-color: #4A7C2F; }
+    .settings-panel { display: none; }
+    .settings-panel.active { display: block; }
+
+    /* ==============================================
+       SECTION TOOLBAR
+       ============================================== */
+    .section-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px; gap: 12px; flex-wrap: wrap;
+    }
+    .toolbar-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+    .search-input {
+      padding: 7px 12px 7px 34px; border: 1.5px solid #ddd; border-radius: 5px;
+      font-size: 13px; font-family: inherit; width: 260px; color: #333;
+      background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 9px center;
+      transition: border-color 0.15s;
+    }
+    .search-input:focus { border-color: #4A7C2F; outline: none; }
+
+    /* ==============================================
+       STATUS BADGES
+       ============================================== */
+    .badge {
+      display: inline-block; padding: 2px 9px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .badge-active   { background: #eaf3e4; color: #3a6b22; }
+    .badge-inactive { background: #f0f0f0; color: #888; }
+
+    /* ==============================================
+       SEED CATALOG
+       ============================================== */
+    .text-muted { font-size: 11px; color: #999; }
+    .row-inactive td { opacity: 0.55; }
+    .modal-lg { max-width: 640px; }
+    .modal-xl { max-width: 740px; }
+
+    /* ==============================================
+       DELIVERY MODAL
+       ============================================== */
+    .deliv-line-row {
+      border: 1.5px solid #e8e8e8; border-radius: 6px;
+      padding: 12px 14px; margin-bottom: 12px; background: #fafff7;
+    }
+    .deliv-line-row:last-child { margin-bottom: 0; }
+    .deliv-line-info { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
+    .deliv-line-info strong { font-size: 13px; color: #2D5016; display: block; margin-bottom: 3px; }
+    .deliv-line-meta { font-size: 12px; color: #888; display: flex; gap: 16px; flex-wrap: wrap; }
+    .deliv-line-fields { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
+    .deliv-line-fields .form-group { margin-bottom: 0; }
+    .filter-select {
+      padding: 6px 11px; border: 1.5px solid #ddd; border-radius: 5px;
+      font-size: 13px; font-family: inherit; color: #333; background: white; cursor: pointer;
+    }
+    .filter-select:focus { border-color: #4A7C2F; outline: none; }
+    .toggle-check {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; color: #555; cursor: pointer; white-space: nowrap;
+    }
+    .toggle-check input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; accent-color: #4A7C2F; }
+
+    /* ==============================================
+       ORDER STATUS BADGES
+       ============================================== */
+    .badge-open      { background: #f0f0f0; color: #666; }
+    .badge-partial   { background: #fef3d8; color: #8a6200; }
+    .badge-delivered { background: #eaf3e4; color: #3a6b22; }
+    .badge-cancelled { background: #fde8e8; color: #a02020; }
+
+    /* ==============================================
+       ORDERS SECTION
+       ============================================== */
+    .orders-view-header {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap;
+    }
+    .order-card {
+      background: white; border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 18px; overflow: hidden;
+    }
+    .order-card-header {
+      padding: 13px 18px; border-bottom: 1px solid #f0f0f0;
+      display: flex; align-items: center; justify-content: space-between; background: #fcfcfc;
+    }
+    .order-card-header h3 {
+      font-size: 12px; font-weight: 700; color: #2D5016;
+      text-transform: uppercase; letter-spacing: 0.6px;
+    }
+    .order-card-body { padding: 16px 18px; }
+    .line-builder {
+      background: #f9faf8; border: 1.5px dashed #cdd8c8;
+      border-radius: 6px; padding: 14px 16px; margin-bottom: 14px;
+    }
+    .cb-label {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 12px; font-weight: 700; color: #555; cursor: pointer; white-space: nowrap;
+    }
+    .cb-label input[type=checkbox] { width: 14px; height: 14px; accent-color: #4A7C2F; cursor: pointer; }
+    .pending-lines-table { width: 100%; border-collapse: collapse; }
+    .pending-lines-table th {
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+      color: #666; border-bottom: 2px solid #eee; padding: 7px 10px; text-align: left; background: #f9f9f9;
+    }
+    .pending-lines-table td {
+      padding: 8px 10px; border-bottom: 1px solid #f5f5f5;
+      font-size: 13px; vertical-align: middle;
+    }
+    .pending-lines-table tbody tr:last-child td { border-bottom: none; }
+    .order-total-bar {
+      display: flex; justify-content: flex-end; align-items: center; gap: 14px;
+      padding: 12px 0 0; border-top: 2px solid #eee; margin-top: 8px;
+    }
+    .order-total-label { font-size: 13px; color: #666; }
+    .order-total-value { font-size: 18px; font-weight: 700; color: #2D5016; }
+    .order-form-footer {
+      padding: 13px 18px; border-top: 1px solid #eee;
+      display: flex; justify-content: space-between; align-items: center; background: #fcfcfc;
+    }
+    .detail-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px;
+    }
+    .detail-field-label {
+      font-size: 11px; color: #aaa; margin-bottom: 3px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .detail-field-value { font-size: 13px; color: #333; font-weight: 500; }
+    .payment-summary-bar { display: flex; gap: 32px; flex-wrap: wrap; }
+    .psb-label { font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+    .psb-value { font-size: 18px; font-weight: 700; color: #2D5016; }
+    .psb-value.balance-due { color: #b87624; }
+    .psb-value.paid-off    { color: #3a6b22; }
+    .badge-prepay { background: #e3ecff; color: #1a4db5; }
+    .overpay-warning {
+      display: flex; align-items: center; gap: 8px;
+      background: #fde8e8; color: #b83232; border-radius: 6px;
+      padding: 9px 14px; font-size: 13px; font-weight: 700;
+      margin-top: 14px; border: 1.5px solid #f5c2c2;
+    }
+
+    /* ==============================================
+       INVENTORY SECTION
+       ============================================== */
+    .inv-row-zero td { background: #fde8e8 !important; }
+    .inv-row-low  td { background: #fef3d8 !important; }
+    .inv-row-zero:hover td { background: #f9d5d5 !important; }
+    .inv-row-low:hover  td { background: #faedce !important; }
+    .inv-badge-zero {
+      display: inline-block; background: #fde8e8; color: #a02020;
+      padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.5px; vertical-align: middle; margin-left: 4px;
+    }
+    .inv-badge-low {
+      display: inline-block; background: #fef3d8; color: #8a6200;
+      padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.5px; vertical-align: middle; margin-left: 4px;
+    }
+
+    /* ==============================================
+       COMMISSIONS SECTION
+       ============================================== */
+    .comm-tier-note {
+      font-size: 12px; color: #777; background: #f9faf8;
+      border: 1px solid #dce8d5; border-radius: 5px;
+      padding: 8px 13px; margin-bottom: 16px; line-height: 1.5;
+    }
+    .var-green { color: #3a6b22; font-weight: 700; }
+    .var-amber { color: #8a6200; font-weight: 700; }
+    .var-red   { color: #a02020; font-weight: 700; }
+    .comm-detail-row { display: none; }
+    .comm-detail-row.open { display: table-row; }
+    .comm-detail-body { background: #f9faf8; padding: 12px 16px; border-top: 1px solid #eef3eb; }
+    .comm-totals-row td {
+      font-weight: 700; border-top: 2px solid #dce0dc;
+      background: #f4f7f2; padding-top: 11px; padding-bottom: 11px;
+    }
+    .toggle-detail-btn {
+      cursor: pointer; background: none; border: 1.5px solid #c8dac0;
+      font-size: 11px; color: #4A7C2F; font-family: inherit; font-weight: 600;
+      padding: 3px 8px; border-radius: 3px; white-space: nowrap;
+      transition: background 0.12s;
+    }
+    .toggle-detail-btn:hover { background: #eaf3e4; }
+
+    /* ==============================================
+       EMPTY STATES
+       ============================================== */
+    .empty-state {
+      background: white; border-radius: 8px; padding: 52px 20px;
+      text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .empty-state-icon { font-size: 32px; opacity: 0.3; margin-bottom: 12px; }
+    .empty-state p { color: #aaa; font-size: 13px; }
+
+    /* ==============================================
+       MODALS
+       ============================================== */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      z-index: 5000; display: flex; align-items: center;
+      justify-content: center; padding: 20px;
+    }
+    .modal {
+      background: white; border-radius: 10px; width: 100%; max-width: 520px;
+      max-height: 92vh; display: flex; flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .modal-sm { max-width: 400px; }
+    .modal-header {
+      padding: 18px 22px 14px; border-bottom: 1px solid #eee;
+      display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+    }
+    .modal-header h3 { font-size: 16px; color: #2D5016; font-weight: 700; }
+    .modal-close {
+      background: none; border: none; font-size: 24px; color: #bbb;
+      cursor: pointer; padding: 0 2px; line-height: 1; transition: color 0.15s;
+    }
+    .modal-close:hover { color: #555; }
+    .modal-body { padding: 20px 22px; overflow-y: auto; flex: 1; }
+    .modal-footer {
+      padding: 14px 22px 18px; border-top: 1px solid #eee;
+      display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0;
+    }
+
+    /* ==============================================
+       LOADING OVERLAY
+       ============================================== */
+    #loading-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 9999;
+      align-items: center; justify-content: center; flex-direction: column; gap: 14px;
+    }
+    #loading-overlay.show { display: flex; }
+    .spinner {
+      width: 42px; height: 42px; border: 4px solid rgba(255,255,255,0.25);
+      border-top-color: white; border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+    .loading-text { color: white; font-size: 13px; opacity: 0.8; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ==============================================
+       TOAST NOTIFICATIONS
+       ============================================== */
+    #toast-container {
+      position: fixed; top: 66px; right: 20px; z-index: 10000;
+      display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+    }
+    .toast {
+      padding: 11px 16px; border-radius: 6px; color: white;
+      font-size: 13px; font-weight: 500; min-width: 260px; max-width: 380px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      display: flex; align-items: flex-start; gap: 8px;
+      animation: toastIn 0.28s ease forwards;
+    }
+    .toast.removing { animation: toastOut 0.25s ease forwards; }
+    .toast.success { background: #3a6b22; }
+    .toast.error   { background: #b83232; }
+    .toast.warning { background: #b87624; }
+    .toast.info    { background: #1e5f8e; }
+    .toast-icon { flex-shrink: 0; }
+    .toast-msg  { flex: 1; line-height: 1.45; }
+    @keyframes toastIn  { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes toastOut { from { opacity: 1; } to { transform: translateX(110%); opacity: 0; } }
+
+    /* ==============================================
+       DASHBOARD
+       ============================================== */
+    .stats-row {
+      display: flex; gap: 14px; margin-bottom: 22px; flex-wrap: wrap;
+    }
+    .stat-card {
+      background: white; border-radius: 8px; padding: 14px 18px;
+      flex: 1; min-width: 150px; box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #999; margin-bottom: 5px; }
+    .stat-value { font-size: 22px; font-weight: 700; color: #2D5016; line-height: 1.1; }
+    .stat-sub   { font-size: 11px; color: #bbb; margin-top: 2px; }
+
+    /* ==============================================
+       SORTABLE TABLE HEADERS
+       ============================================== */
+    .th-sortable { cursor: pointer; user-select: none; }
+    .th-sortable:hover { background: #f0f0f0 !important; }
+    .sort-arrow { margin-left: 4px; font-size: 10px; opacity: 0.45; }
+    .th-sortable.sort-active { color: #2D5016; }
+    .th-sortable.sort-active .sort-arrow { opacity: 1; }
+
+    /* ==============================================
+       ORDER STATUS FILTER TABS
+       ============================================== */
+    .status-filter-tabs {
+      display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap;
+    }
+    .status-filter-tab {
+      padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1.5px solid #ddd; background: white; color: #666;
+      font-family: inherit; transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .status-filter-tab:hover { border-color: #aaa; color: #333; }
+    .status-filter-tab.active { background: #2D5016; color: white; border-color: #2D5016; }
+
+    /* ==============================================
+       DASHBOARD SECTIONS
+       ============================================== */
+    .dash-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+      margin-bottom: 24px; align-items: start;
+    }
+    .dash-section { margin-bottom: 0; }
+    .dash-section-title {
+      font-size: 13px; font-weight: 700; color: #2D5016; text-transform: uppercase;
+      letter-spacing: 0.6px; margin-bottom: 10px; padding-bottom: 7px;
+      border-bottom: 2px solid #e8e8e8;
+    }
+
+    /* ==============================================
+       ALERT CARDS
+       ============================================== */
+    .alert-list { display: flex; flex-direction: column; gap: 8px; }
+    .alert-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      background: white; border-radius: 6px; padding: 11px 14px;
+      border-left: 4px solid #d68910; box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+    .alert-item.alert-danger { border-left-color: #c0392b; }
+    .alert-item.alert-info   { border-left-color: #1e5f8e; }
+    .alert-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+    .alert-body { flex: 1; }
+    .alert-title { font-size: 13px; font-weight: 700; color: #333; }
+    .alert-sub   { font-size: 12px; color: #777; margin-top: 2px; }
+    .no-alerts {
+      background: white; border-radius: 6px; padding: 14px 18px;
+      color: #888; font-size: 13px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+
+    /* ==============================================
+       RESPONSIVE
+       ============================================== */
+    @media (max-width: 700px) {
+      .sidebar { width: 52px; }
+      .nav-link span:not(.nav-icon) { display: none; }
+      .nav-section-label { display: none; }
+      .sidebar-footer { display: none; }
+      .sidebar-year-picker { display: none; }
+      .content { padding: 16px 14px; }
+      .header-brand-sub, .header-brand-sep { display: none; }
+      .header-user-name { display: none; }
+      .form-row { grid-template-columns: 1fr; }
+      .search-input { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ============================================================
+     LOGIN SCREEN
+     ============================================================ -->
+<div id="login-screen">
+  <div class="login-card">
+    <h1>Greenwing Ag</h1>
+    <p class="login-subtitle">Seed Tracking System</p>
+    <hr class="login-divider">
+    <button class="btn-google" id="sign-in-btn" onclick="signIn()">
+      <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+      </svg>
+      Sign in with Google
+    </button>
+    <p class="login-footer">
+      Access is controlled by your Google Sheets permissions.<br>
+      Contact your administrator if you cannot sign in.
+    </p>
+  </div>
+</div>
+
+
+<!-- ============================================================
+     APP SHELL
+     ============================================================ -->
+<div id="app-shell">
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-brand">
+      <span class="header-brand-name">Greenwing Ag</span>
+      <span class="header-brand-sep">|</span>
+      <span class="header-brand-sub">Seed Tracking</span>
+    </div>
+    <div class="header-user">
+      <img id="user-avatar-img" class="header-user-avatar" src="" alt="" style="display:none"
+           onerror="this.style.display='none'">
+      <div id="user-avatar-placeholder" class="header-user-avatar-placeholder" style="display:none"></div>
+      <span class="header-user-name" id="header-user-name"></span>
+      <button class="btn-signout" onclick="signOut()">Sign Out</button>
+    </div>
+  </header>
+
+  <!-- Body -->
+  <div class="app-body">
+
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+
+      <!-- Crop Year Selector -->
+      <div class="sidebar-year-picker">
+        <div class="sidebar-year-label">Crop Year</div>
+        <select class="sidebar-year-select" id="crop-year-select"
+                onchange="onCropYearChange(this.value)">
+          <option value="2025-2026">2025-2026</option>
+        </select>
+      </div>
+
+      <ul class="sidebar-nav" role="navigation" aria-label="Main navigation">
+        <li>
+          <a class="nav-link active" data-section="dashboard"
+             onclick="navTo('dashboard'); return false;" href="#">
+            <i class="nav-icon">&#9783;</i><span>Dashboard</span>
+          </a>
+        </li>
+        <li class="nav-section-label">Seed Operations</li>
+        <li>
+          <a class="nav-link" data-section="orders"
+             onclick="navTo('orders'); return false;" href="#">
+            <i class="nav-icon">&#9113;</i><span>Orders</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" data-section="seed-catalog"
+             onclick="navTo('seed-catalog'); return false;" href="#">
+            <i class="nav-icon">&#9880;</i><span>Seed Catalog</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" data-section="inventory"
+             onclick="navTo('inventory'); return false;" href="#">
+            <i class="nav-icon">&#11019;</i><span>Inventory</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-link" data-section="commissions"
+             onclick="navTo('commissions'); return false;" href="#">
+            <i class="nav-icon">&#9998;</i><span>Commissions</span>
+          </a>
+        </li>
+        <li class="nav-section-label">Accounts</li>
+        <li>
+          <a class="nav-link" data-section="customers"
+             onclick="navTo('customers'); return false;" href="#">
+            <i class="nav-icon">&#9786;</i><span>Customers</span>
+          </a>
+        </li>
+        <li class="nav-section-label">System</li>
+        <li>
+          <a class="nav-link" data-section="settings"
+             onclick="navTo('settings'); return false;" href="#">
+            <i class="nav-icon">&#9881;</i><span>Settings</span>
+          </a>
+        </li>
+      </ul>
+      <div class="sidebar-footer">
+        <div class="conn-status" id="conn-status" title="Google Sheets connection status">
+          <span class="conn-dot checking" id="conn-dot"></span>
+          <span id="conn-label">Connecting&hellip;</span>
+        </div>
+        <div class="sidebar-about">
+          <div class="sidebar-about-name">Greenwing Ag &mdash; Seed</div>
+          <div class="sidebar-about-sub">v1.0 &middot; Greenwing Ag</div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="content" id="main-content">
+
+      <!-- ======= DASHBOARD ======= -->
+      <div id="section-dashboard" class="section active">
+        <div class="section-header">
+          <h2>Dashboard</h2>
+          <p>Seed tracking overview for <span id="dash-crop-year">—</span>.</p>
+        </div>
+        <div id="dash-content">
+          <div class="empty-state"><p>Loading&hellip;</p></div>
+        </div>
+      </div>
+
+      <!-- ======= ORDERS ======= -->
+      <div id="section-orders" class="section">
+        <div class="section-header">
+          <h2>Orders</h2>
+          <p>Manage seed orders for <span class="cy-label">—</span>.</p>
+        </div>
+        <div id="orders-content">
+          <div class="empty-state"><p>Loading&hellip;</p></div>
+        </div>
+      </div>
+
+      <!-- ======= SEED CATALOG ======= -->
+      <div id="section-seed-catalog" class="section">
+        <div class="section-header">
+          <h2>Seed Catalog</h2>
+          <p>Varieties available for <span class="cy-label">—</span>.</p>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="section-toolbar">
+          <div class="toolbar-left">
+            <select id="catalog-filter-crop" class="filter-select" onchange="filterCatalog()">
+              <option value="">All Crops</option>
+            </select>
+            <select id="catalog-filter-supplier" class="filter-select" onchange="filterCatalog()">
+              <option value="">All Suppliers</option>
+            </select>
+            <label class="toggle-check">
+              <input type="checkbox" id="catalog-show-inactive" onchange="filterCatalog()">
+              Show inactive
+            </label>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary" onclick="copyToNextYear()">&#8689; Copy to Next Year</button>
+            <button class="btn btn-primary" onclick="openVarietyForm()">+ New Variety</button>
+          </div>
+        </div>
+
+        <div id="catalog-table-container">
+          <div class="empty-state"><p>Loading&hellip;</p></div>
+        </div>
+      </div>
+
+      <!-- ======= INVENTORY ======= -->
+      <div id="section-inventory" class="section">
+        <div class="section-header">
+          <h2>Inventory</h2>
+          <p>Seed lots on hand for <span class="cy-label">—</span>.</p>
+        </div>
+
+        <div class="sub-tabs">
+          <button class="sub-tab active" data-tab="inv-summary"
+                  onclick="showInvTab('inv-summary')">Summary</button>
+          <button class="sub-tab" data-tab="inv-lots"
+                  onclick="showInvTab('inv-lots')">Lots</button>
+        </div>
+
+        <!-- Summary panel -->
+        <div id="inv-panel-summary" class="settings-panel active">
+          <div class="section-toolbar">
+            <div class="toolbar-left">
+              <span id="inv-summary-info" style="font-size:13px;color:#666;"></span>
+            </div>
+            <button class="btn btn-primary" onclick="openLogLotForm()">+ Log Inbound Lot</button>
+          </div>
+          <div id="inv-summary-container">
+            <div class="empty-state"><p>Loading&hellip;</p></div>
+          </div>
+        </div>
+
+        <!-- Lots panel -->
+        <div id="inv-panel-lots" class="settings-panel">
+          <div class="section-toolbar">
+            <div class="toolbar-left"></div>
+            <button class="btn btn-primary" onclick="openLogLotForm()">+ Log Inbound Lot</button>
+          </div>
+          <div id="inv-lots-container">
+            <div class="empty-state"><p>Loading&hellip;</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======= COMMISSIONS ======= -->
+      <div id="section-commissions" class="section">
+        <div class="section-header">
+          <h2>Commissions</h2>
+          <p>Supplier commission tracking for <span class="cy-label">—</span>.</p>
+        </div>
+        <p class="comm-tier-note">&#9432;&ensp;Commission rates are flat per-bag for this season. Graduated tiers planned for a future release.</p>
+        <div id="commissions-content">
+          <div class="empty-state"><p>Loading&hellip;</p></div>
+        </div>
+      </div>
+
+      <!-- ======= CUSTOMERS ======= -->
+      <div id="section-customers" class="section">
+        <div class="section-header">
+          <h2>Customers</h2>
+          <p>Shared customer list from the chemical system.</p>
+        </div>
+        <div class="placeholder-card">
+          <div class="placeholder-icon">&#9786;</div>
+          <h3>Customers</h3>
+          <p>Customers are shared with the chemical system. View and manage them there, or they will be selectable in seed orders.</p>
+          <span class="placeholder-badge">Shared Data</span>
+        </div>
+      </div>
+
+      <!-- ======= SETTINGS ======= -->
+      <div id="section-settings" class="section">
+        <div class="section-header">
+          <h2>Settings</h2>
+          <p>Configure crop years, salespeople, and suppliers.</p>
+        </div>
+        <!-- Sub-tab buttons -->
+        <div class="sub-tabs">
+          <button class="sub-tab active" data-tab="crop-years"
+                  onclick="showSettingsTab('crop-years')">Crop Years</button>
+          <button class="sub-tab" data-tab="salespeople"
+                  onclick="showSettingsTab('salespeople')">Salespeople</button>
+          <button class="sub-tab" data-tab="suppliers"
+                  onclick="showSettingsTab('suppliers')">Suppliers</button>
+        </div>
+
+        <!-- Crop Years panel -->
+        <div id="settings-panel-crop-years" class="settings-panel active">
+          <div class="section-toolbar">
+            <div class="toolbar-left">
+              <span style="font-size:13px;color:#666;">
+                Crop years appear in the sidebar selector and all screens.
+              </span>
+            </div>
+            <button class="btn btn-primary" onclick="openCropYearForm()">+ Add Crop Year</button>
+          </div>
+          <div id="crop-years-table-container">
+            <div class="empty-state"><p>Loading&hellip;</p></div>
+          </div>
+        </div>
+
+        <!-- Salespeople panel -->
+        <div id="settings-panel-salespeople" class="settings-panel">
+          <div class="section-toolbar">
+            <div class="toolbar-left">
+              <span style="font-size:13px;color:#666;">
+                Salespeople are assigned to seed orders.
+              </span>
+            </div>
+            <button class="btn btn-primary" onclick="openSalespersonForm()">+ Add Salesperson</button>
+          </div>
+          <div id="salespeople-table-container">
+            <div class="empty-state"><p>Loading&hellip;</p></div>
+          </div>
+        </div>
+
+        <!-- Suppliers panel -->
+        <div id="settings-panel-suppliers" class="settings-panel">
+          <div class="section-toolbar">
+            <div class="toolbar-left">
+              <span style="font-size:13px;color:#666;">
+                Suppliers are managed in the chemical system (Vendors tab). Shown here for reference.
+              </span>
+            </div>
+          </div>
+          <div id="suppliers-table-container">
+            <div class="empty-state"><p>Loading&hellip;</p></div>
+          </div>
+        </div>
+
+      </div><!-- /section-settings -->
+
+    </main><!-- /content -->
+  </div><!-- /app-body -->
+</div><!-- /app-shell -->
+
+
+<!-- ============================================================
+     MODAL (reusable form dialog)
+     ============================================================ -->
+<div id="modal-overlay" class="modal-overlay" style="display:none"
+     onclick="closeModalOnOverlay(event)">
+  <div class="modal" id="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 id="modal-title">Dialog</h3>
+      <button class="modal-close" onclick="closeModal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+
+<!-- ============================================================
+     CONFIRM DIALOG
+     ============================================================ -->
+<div id="confirm-overlay" class="modal-overlay" style="display:none"
+     onclick="closeConfirmOnOverlay(event)">
+  <div class="modal modal-sm" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 id="confirm-title">Confirm</h3>
+      <button class="modal-close" onclick="closeConfirm()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirm-message" style="font-size:14px;color:#444;line-height:1.6;"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-danger" id="confirm-ok-btn" onclick="executeConfirm()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============================================================
+     LOADING OVERLAY
+     ============================================================ -->
+<div id="loading-overlay" role="status" aria-live="polite">
+  <div class="spinner"></div>
+  <span class="loading-text" id="loading-text">Loading&hellip;</span>
+</div>
+
+
+<!-- ============================================================
+     TOAST CONTAINER
+     ============================================================ -->
+<div id="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+
+<!-- ============================================================
+     SCRIPTS
+     ============================================================ -->
+<script src="https://accounts.google.com/gsi/client" async defer
+        onload="onGISLoad()" onerror="onGISError()"></script>
+<script src="https://apis.googleapis.com/js/api.js"
+        onload="onGapiLoad()" onerror="onGapiError()"></script>
+
+<script>
+'use strict';
+
+/* ===========================================================
+   CONFIGURATION
+   =========================================================== */
+const SHEET_ID  = '1N1XYHAP2CGlKdrqnRHcVdKm2TQ3tiTjfu-Sv8hbsjfU';
+const CLIENT_ID = '340528542311-ld56h96a09377h85oto7rlhl1cci03gf.apps.googleusercontent.com';
+const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets';
+
+/* ===========================================================
+   SHEET STRUCTURE — SEED TABS ONLY
+   (Does not include tabs owned by the chemical system.)
+   =========================================================== */
+const HEADERS = {
+  CropYears:      ['ID', 'Label', 'Active'],
+  SeedCatalog:    ['ID', 'CropYear', 'Crop', 'Brand', 'VarietyName', 'Package', 'SeedSize',
+                   'Supplier', 'CostPerBag', 'DefaultSellPrice', 'CommissionPerBag', 'Active', 'Notes'],
+  SeedLots:       ['ID', 'CropYear', 'DateReceived', 'VarietyID', 'LotNumber',
+                   'QtyReceived', 'QtyRemaining', 'Supplier', 'Notes'],
+  SeedOrders:     ['ID', 'CropYear', 'OrderDate', 'CustomerID', 'SalespersonID', 'Status', 'Notes'],
+  SeedOrderLines: ['ID', 'OrderID', 'VarietyOrdered', 'VarietyFulfilled', 'SubNote',
+                   'Qty', 'PricePerBag', 'GWBox', 'Tender', 'GA',
+                   'DeliveryStatus', 'QtyDelivered', 'DeliveryDate'],
+  SeedPayments:   ['ID', 'OrderID', 'Date', 'Amount', 'Method', 'Note'],
+  SeedCommissions:['ID', 'CropYear', 'Supplier', 'BagsDelivered', 'RatePerBag',
+                   'ExpectedTotal', 'AmountReceived', 'DateReceived', 'Variance', 'Notes'],
+  SeedSalespeople:['ID', 'Name', 'Active'],
+};
+
+/* ===========================================================
+   APP STATE
+   =========================================================== */
+let currentUser        = null;   // { name, email, photoUrl, initials }
+let accessToken        = null;   // OAuth access token
+let tokenClient        = null;   // GIS token client
+let gisReady           = false;
+let gapiReady          = false;
+let _sheetsInitialized = false;
+
+let currentCropYear    = '2025-2026';
+
+// In-memory caches (null = not yet loaded)
+let _cropYears      = null;
+let _salespeople    = null;
+let _vendors        = null;       // shared Vendors tab (read-only in seed app)
+let _seedCatalog    = null;
+let _seedOrders     = null;
+let _seedOrderLines = null;
+let _customers      = null;       // shared Customers tab (read-only in seed app)
+let _seedPayments    = null;
+let _seedCommissions = null;
+let _seedLots        = null;
+
+// In-progress order creation line items
+let _pendingLines = [];
+
+// Confirm dialog callback
+let _confirmCallback = null;
+
+// Loading spinner delay timer
+let _loadingTimer = null;
+
+// Order list sort + filter state
+let _orderSortCol      = 'OrderDate';  // column key
+let _orderSortDir      = 'desc';       // 'asc' | 'desc'
+let _orderStatusFilter = '';           // '' = All, or 'Open'/'Partial'/'Delivered'/'Cancelled'
+
+/* ===========================================================
+   GIS / GAPI LIBRARY CALLBACKS
+   =========================================================== */
+
+function onGISLoad() {
+  if (!google?.accounts?.oauth2) {
+    console.error('GIS loaded but oauth2 not available.');
+    return;
+  }
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: handleTokenResponse,
+    error_callback: handleAuthError,
+  });
+  gisReady = true;
+}
+
+function onGISError() {
+  console.error('Failed to load Google Identity Services.');
+  showToast('Could not load authentication library. Check your internet connection.', 'error');
+}
+
+function onGapiLoad() {
+  gapi.load('client', () => {
+    gapi.client.init({}).then(() => {
+      gapiReady = true;
+      if (accessToken) gapi.client.setToken({ access_token: accessToken });
+    }).catch(err => console.error('gapi init error:', err));
+  });
+}
+
+function onGapiError() {
+  console.warn('gapi failed to load — will use fetch() for all Sheets requests.');
+}
+
+/* ===========================================================
+   SHEETS API LAYER
+   =========================================================== */
+
+async function sheetsRequest(method, pathSuffix, body) {
+  if (!accessToken) throw new Error('Not authenticated. Please sign in.');
+
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(SHEET_ID)}${pathSuffix}`;
+  const opts = {
+    method,
+    headers: {
+      'Authorization': 'Bearer ' + accessToken,
+      'Content-Type':  'application/json',
+    },
+  };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+
+  const resp = await fetch(url, opts);
+  const data = await resp.json().catch(() => ({}));
+
+  if (!resp.ok) {
+    const msg = data.error?.message || `HTTP ${resp.status}`;
+    if (resp.status === 401) throw new Error('Session expired. Please sign out and sign back in.');
+    if (resp.status === 403) throw new Error('Access denied. Ensure your Google account has edit access to the Sheet.');
+    if (resp.status === 404) throw new Error('Sheet not found. Check the SHEET_ID configuration.');
+    throw new Error(msg);
+  }
+  return data;
+}
+
+async function getSheetMeta() {
+  return sheetsRequest('GET', '?fields=sheets.properties.title');
+}
+
+async function getSheetValues(tabName) {
+  const range = encodeURIComponent(`${tabName}!A:Z`);
+  return sheetsRequest('GET', `/values/${range}`);
+}
+
+async function appendRows(tabName, values) {
+  const range = encodeURIComponent(tabName);
+  return sheetsRequest(
+    'POST',
+    `/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    { values }
+  );
+}
+
+async function updateValues(range, values) {
+  const encoded = encodeURIComponent(range);
+  return sheetsRequest(
+    'PUT',
+    `/values/${encoded}?valueInputOption=USER_ENTERED`,
+    { range, values }
+  );
+}
+
+async function batchUpdateValues(dataArray) {
+  return sheetsRequest('POST', '/values:batchUpdate', {
+    valueInputOption: 'USER_ENTERED',
+    data: dataArray,
+  });
+}
+
+async function batchUpdateStructure(requests) {
+  return sheetsRequest('POST', ':batchUpdate', { requests });
+}
+
+async function loadSheetData(tabName) {
+  const result = await getSheetValues(tabName);
+  const rows = result.values || [];
+  if (rows.length <= 1) return [];
+
+  const headers = rows[0];
+  return rows.slice(1)
+    .map((row, i) => {
+      const obj = { _row: i + 2 };
+      headers.forEach((h, j) => { obj[h] = row[j] !== undefined ? row[j] : ''; });
+      return obj;
+    })
+    .filter(obj => obj.ID !== '__DELETED__');
+}
+
+async function appendSheetRow(tabName, data) {
+  const headers = HEADERS[tabName];
+  const values  = [headers.map(h => (data[h] !== undefined ? String(data[h]) : ''))];
+  return appendRows(tabName, values);
+}
+
+async function updateSheetRow(tabName, rowIndex, data) {
+  const headers = HEADERS[tabName];
+  const endCol  = String.fromCharCode(64 + headers.length);
+  const range   = `${tabName}!A${rowIndex}:${endCol}${rowIndex}`;
+  const values  = [headers.map(h => (data[h] !== undefined ? String(data[h]) : ''))];
+  return updateValues(range, values);
+}
+
+/* ===========================================================
+   SHEET INITIALISATION
+   Creates missing seed tabs and writes header rows.
+   Never touches tabs owned by the chemical system.
+   =========================================================== */
+
+async function initializeSheets() {
+  const meta     = await getSheetMeta();
+  const existing = new Set((meta.sheets || []).map(s => s.properties.title));
+  const missing  = Object.keys(HEADERS).filter(name => !existing.has(name));
+
+  if (missing.length > 0) {
+    await batchUpdateStructure(
+      missing.map(name => ({ addSheet: { properties: { title: name } } }))
+    );
+    await batchUpdateValues(
+      missing.map(name => ({
+        range:  `${name}!A1:${String.fromCharCode(64 + HEADERS[name].length)}1`,
+        values: [HEADERS[name]],
+      }))
+    );
+  }
+
+  // Column migration: add any missing headers to existing seed tabs
+  const colMigrations = [];
+  for (const tabName of Object.keys(HEADERS)) {
+    if (missing.includes(tabName)) continue;
+    try {
+      const result = await getSheetValues(tabName);
+      const existingHeaders = (result.values || [])[0] || [];
+      const expectedHeaders = HEADERS[tabName];
+      if (existingHeaders.length < expectedHeaders.length) {
+        const endCol = String.fromCharCode(64 + expectedHeaders.length);
+        colMigrations.push({
+          range:  `${tabName}!A1:${endCol}1`,
+          values: [expectedHeaders],
+        });
+      }
+    } catch (e) {
+      console.warn(`Could not check headers for ${tabName}:`, e.message);
+    }
+  }
+  if (colMigrations.length > 0) {
+    await batchUpdateValues(colMigrations);
+  }
+}
+
+async function ensureSheetsInitialized() {
+  if (_sheetsInitialized) return;
+  await initializeSheets();
+  _sheetsInitialized = true;
+}
+
+/* ===========================================================
+   CROP YEAR SELECTOR
+   =========================================================== */
+
+async function loadCropYearSelector() {
+  try {
+    _cropYears = await loadSheetData('CropYears');
+    const select = document.getElementById('crop-year-select');
+    if (!select) return;
+
+    const active = (_cropYears || []).filter(cy =>
+      cy.Active !== 'FALSE' && cy.Active !== 'false' && cy.Active !== '0' && cy.Active !== ''
+    );
+
+    if (active.length === 0) {
+      select.innerHTML = '<option value="2025-2026">2025-2026</option>';
+      currentCropYear = '2025-2026';
+    } else {
+      const sorted = [...active].sort((a, b) => b.Label.localeCompare(a.Label));
+      select.innerHTML = sorted
+        .map(cy => `<option value="${escapeHtml(cy.Label)}">${escapeHtml(cy.Label)}</option>`)
+        .join('');
+      currentCropYear = sorted[0].Label;
+    }
+    select.value = currentCropYear;
+    updateCropYearLabels();
+  } catch (err) {
+    console.warn('Could not load crop years:', err.message);
+  }
+}
+
+function onCropYearChange(val) {
+  currentCropYear = val;
+  _orderStatusFilter = '';
+  _orderSortCol = 'OrderDate';
+  _orderSortDir = 'desc';
+  updateCropYearLabels();
+  const activeSection = document.querySelector('.section.active')?.id?.replace('section-', '');
+  if (activeSection === 'seed-catalog')  loadSeedCatalogSection();
+  if (activeSection === 'orders')        loadOrdersSection();
+  if (activeSection === 'dashboard')     loadDashboardSection();
+  if (activeSection === 'inventory')     loadInventorySection();
+  if (activeSection === 'commissions')   loadCommissionsSection();
+}
+
+function updateCropYearLabels() {
+  document.querySelectorAll('.cy-label').forEach(el => { el.textContent = currentCropYear; });
+  const dashLbl = document.getElementById('dash-crop-year');
+  if (dashLbl) dashLbl.textContent = currentCropYear;
+}
+
+/* ===========================================================
+   DASHBOARD
+   =========================================================== */
+
+async function loadDashboardSection() {
+  const container = document.getElementById('dash-content');
+  updateCropYearLabels();
+  container.innerHTML = '<div class="empty-state"><p>Loading&hellip;</p></div>';
+
+  try {
+    await ensureSheetsInitialized();
+    const results = await Promise.all([
+      loadSheetData('SeedOrders'),
+      loadSheetData('SeedOrderLines'),
+      loadSheetData('SeedPayments'),
+      loadSheetData('SeedCommissions'),
+      loadSheetData('SeedLots'),
+      loadSheetData('SeedCatalog'),
+    ]);
+    _seedOrders      = results[0];
+    _seedOrderLines  = results[1];
+    _seedPayments    = results[2];
+    _seedCommissions = results[3];
+    _seedLots        = results[4];
+    _seedCatalog     = results[5];
+    if (!_customers) {
+      try { _customers = await loadSheetData('Customers'); } catch(e) { _customers = []; }
+    }
+    if (!_salespeople) {
+      try { _salespeople = await loadSheetData('SeedSalespeople'); } catch(e) { _salespeople = []; }
+    }
+    renderDashboard();
+  } catch (err) {
+    container.innerHTML = `<div class="empty-state"><p>Error: ${escapeHtml(err.message)}</p></div>`;
+    showToast('Error loading dashboard: ' + err.message, 'error');
+    console.error(err);
+  }
+}
+
+function renderDashboard() {
+  const container = document.getElementById('dash-content');
+  if (!container) return;
+
+  const cy = currentCropYear;
+
+  // Scope all data to current crop year
+  const yearOrders = (_seedOrders || []).filter(o => o.CropYear === cy);
+  const yearOrderIds = new Set(yearOrders.map(o => o.ID));
+  const yearLines    = (_seedOrderLines  || []).filter(l => yearOrderIds.has(l.OrderID));
+  const yearPayments = (_seedPayments    || []).filter(p => yearOrderIds.has(p.OrderID));
+  const yearComms    = (_seedCommissions || []).filter(c => c.CropYear === cy);
+
+  // Active orders (exclude cancelled) for most financial metrics
+  const activeOrders   = yearOrders.filter(o => o.Status !== 'Cancelled');
+  const activeOrderIds = new Set(activeOrders.map(o => o.ID));
+  const activeLines    = yearLines.filter(l => activeOrderIds.has(l.OrderID));
+  const activePays     = yearPayments.filter(p => activeOrderIds.has(p.OrderID));
+
+  // === Stat card metrics ===
+  const totalOrders        = activeOrders.length;
+  const totalBagsOrdered   = activeLines.reduce((s, l) => s + (parseInt(l.Qty) || 0), 0);
+  const totalBagsDelivered = activeLines.reduce((s, l) => s + (parseInt(l.QtyDelivered) || 0), 0);
+  const totalOrderValue    = activeLines.reduce((s, l) =>
+    s + (parseInt(l.Qty) || 0) * (parseInt(l.PricePerBag) || 0), 0);
+  const totalCollected  = activePays.reduce((s, p) => s + (parseInt(p.Amount) || 0), 0);
+  const totalOutstanding = Math.max(0, totalOrderValue - totalCollected);
+
+  // === Orders by status ===
+  const statusGroups = { Open: {count:0, bags:0}, Partial: {count:0, bags:0},
+                         Delivered: {count:0, bags:0}, Cancelled: {count:0, bags:0} };
+  for (const o of yearOrders) {
+    const st = o.Status || 'Open';
+    if (!statusGroups[st]) statusGroups[st] = { count:0, bags:0 };
+    statusGroups[st].count++;
+    const oBags = yearLines
+      .filter(l => l.OrderID === o.ID)
+      .reduce((s, l) => s + (parseInt(l.Qty) || 0), 0);
+    statusGroups[st].bags += oBags;
+  }
+
+  // === Commission metrics ===
+  const expectedComm = yearComms.reduce((s, c) => s + (parseInt(c.ExpectedTotal)  || 0), 0);
+  const receivedComm = yearComms.reduce((s, c) => s + (parseInt(c.AmountReceived) || 0), 0);
+  const commVariance = expectedComm - receivedComm;
+
+  // === Alerts ===
+  const alerts = [];
+
+  // Flag: open/partial orders with zero delivery after March 1 of crop year end
+  const endYear = parseInt((cy.split('-')[1] || String(new Date().getFullYear())));
+  const march1  = `${endYear}-03-01`;
+  const today   = new Date().toISOString().slice(0, 10);
+  if (today >= march1) {
+    for (const o of activeOrders) {
+      if (o.Status === 'Delivered') continue;
+      const oLines = yearLines.filter(l => l.OrderID === o.ID);
+      const anyDelivered = oLines.some(l => (parseInt(l.QtyDelivered) || 0) > 0);
+      if (!anyDelivered) {
+        alerts.push({
+          cls: 'alert-warning',
+          icon: '&#9888;',
+          title: 'No delivery recorded \u2014 ' + escapeHtml(getCustomerName(o.CustomerID)),
+          sub:   'Order from ' + formatDate(o.OrderDate) + ' &mdash; Status: ' + escapeHtml(o.Status || 'Open'),
+        });
+      }
+    }
+  }
+
+  // Flag: orders with balance due > $5,000
+  for (const o of activeOrders) {
+    const t = getOrderTotals(o.ID);
+    if (t.balanceDue > 500000) {
+      alerts.push({
+        cls: 'alert-danger',
+        icon: '&#9888;',
+        title: 'High balance due \u2014 ' + escapeHtml(getCustomerName(o.CustomerID)),
+        sub:   'Balance: ' + formatCurrency(t.balanceDue) + ' (Order: ' + formatDate(o.OrderDate) + ')',
+      });
+    }
+  }
+
+  // Inventory alerts: zero-remaining and low-stock varieties
+  const yearLots = (_seedLots || []).filter(l => l.CropYear === cy);
+  if (yearLots.length > 0) {
+    const lotMap = {};
+    for (const lot of yearLots) {
+      const vid = lot.VarietyID;
+      if (!lotMap[vid]) lotMap[vid] = 0;
+      lotMap[vid] += parseInt(lot.QtyRemaining) || 0;
+    }
+    const lotReceived = {};
+    for (const lot of yearLots) {
+      const vid = lot.VarietyID;
+      if (!lotReceived[vid]) lotReceived[vid] = 0;
+      lotReceived[vid] += parseInt(lot.QtyReceived) || 0;
+    }
+    for (const [vid, remaining] of Object.entries(lotMap)) {
+      const label = getVarietyLabel(vid);
+      if (remaining === 0 && (lotReceived[vid] || 0) > 0) {
+        alerts.push({
+          cls: 'alert-danger',
+          icon: '&#9888;',
+          title: 'Out of stock \u2014 ' + escapeHtml(label),
+          sub:   'No bags remaining in inventory.',
+        });
+      } else if (remaining > 0 && remaining < 10) {
+        alerts.push({
+          cls: '',
+          icon: '&#9888;',
+          title: 'Low stock \u2014 ' + escapeHtml(label),
+          sub:   remaining + ' bag' + (remaining === 1 ? '' : 's') + ' remaining.',
+        });
+      }
+    }
+  }
+
+  // === Build HTML ===
+
+  const statCardsHtml = `
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Total Orders</div>
+        <div class="stat-value">${totalOrders}</div>
+        <div class="stat-sub">excl. cancelled</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Bags Ordered</div>
+        <div class="stat-value">${totalBagsOrdered.toLocaleString()}</div>
+        <div class="stat-sub">bags</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Bags Delivered</div>
+        <div class="stat-value">${totalBagsDelivered.toLocaleString()}</div>
+        <div class="stat-sub">of ${totalBagsOrdered.toLocaleString()} ordered</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Order Value</div>
+        <div class="stat-value">${formatCurrency(totalOrderValue)}</div>
+        <div class="stat-sub">${escapeHtml(cy)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Collected</div>
+        <div class="stat-value">${formatCurrency(totalCollected)}</div>
+        <div class="stat-sub">payments received</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Outstanding Balance</div>
+        <div class="stat-value" style="color:${totalOutstanding > 0 ? '#b87624' : '#3a6b22'}">${formatCurrency(totalOutstanding)}</div>
+        <div class="stat-sub">invoiced minus paid</div>
+      </div>
+    </div>`;
+
+  const statusRowsHtml = ['Open','Partial','Delivered','Cancelled'].map(st => {
+    const g = statusGroups[st] || { count:0, bags:0 };
+    return `<tr>
+      <td>${orderStatusBadgeHtml(st)}</td>
+      <td style="text-align:right;font-weight:600">${g.count}</td>
+      <td style="text-align:right;font-weight:600">${g.bags.toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+
+  const ordersTableHtml = `
+    <div class="dash-section">
+      <div class="dash-section-title">Orders by Status</div>
+      <table class="data-table">
+        <thead><tr>
+          <th>Status</th>
+          <th style="text-align:right">Orders</th>
+          <th style="text-align:right">Total Bags</th>
+        </tr></thead>
+        <tbody>${statusRowsHtml}</tbody>
+      </table>
+    </div>`;
+
+  const varRow = expectedComm > 0
+    ? `<tr><td>Commission Variance</td>
+       <td style="text-align:right;font-weight:700;color:${commVariance > 0 ? '#b87624' : '#3a6b22'}">${formatCurrency(commVariance)}</td></tr>`
+    : '';
+
+  const financialHtml = `
+    <div class="dash-section">
+      <div class="dash-section-title">Financial Summary</div>
+      <table class="data-table">
+        <tbody>
+          <tr><td>Total Invoiced</td>
+              <td style="text-align:right;font-weight:700">${formatCurrency(totalOrderValue)}</td></tr>
+          <tr><td>Total Collected</td>
+              <td style="text-align:right;font-weight:700">${formatCurrency(totalCollected)}</td></tr>
+          <tr><td>Total Outstanding</td>
+              <td style="text-align:right;font-weight:700;color:${totalOutstanding > 0 ? '#b87624' : '#3a6b22'}">${formatCurrency(totalOutstanding)}</td></tr>
+          <tr style="border-top:2px solid #eee">
+              <td style="padding-top:12px">Expected Commission This Season</td>
+              <td style="text-align:right;font-weight:700;padding-top:12px">${formatCurrency(expectedComm)}</td></tr>
+          <tr><td>Commission Received to Date</td>
+              <td style="text-align:right;font-weight:700">${formatCurrency(receivedComm)}</td></tr>
+          ${varRow}
+        </tbody>
+      </table>
+    </div>`;
+
+  const alertsBodyHtml = alerts.length === 0
+    ? '<div class="no-alerts">&#10003;&ensp;No alerts &mdash; everything looks good for ' + escapeHtml(cy) + '.</div>'
+    : '<div class="alert-list">' + alerts.map(a =>
+        `<div class="alert-item ${a.cls}">
+           <div class="alert-icon">${a.icon}</div>
+           <div class="alert-body">
+             <div class="alert-title">${a.title}</div>
+             <div class="alert-sub">${a.sub}</div>
+           </div>
+         </div>`).join('') + '</div>';
+
+  const alertsSectionHtml = `
+    <div class="dash-section" style="margin-top:24px">
+      <div class="dash-section-title">Alerts</div>
+      ${alertsBodyHtml}
+    </div>`;
+
+  container.innerHTML = statCardsHtml +
+    `<div class="dash-grid">${ordersTableHtml}${financialHtml}</div>` +
+    alertsSectionHtml;
+}
+
+/* ===========================================================
+   SETTINGS SECTION CONTROLLER
+   =========================================================== */
+
+async function renderSettings() {
+  setLoading(true, 'Loading settings…');
+  try {
+    await ensureSheetsInitialized();
+    await Promise.all([
+      loadCropYearsPanel(),
+      loadSalespeoplePanel(),
+      loadSuppliersPanel(),
+    ]);
+    const activeTab = document.querySelector('#section-settings .sub-tab.active')?.dataset.tab || 'crop-years';
+    showSettingsTab(activeTab);
+  } catch (err) {
+    showToast('Failed to load settings: ' + err.message, 'error');
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function showSettingsTab(tab) {
+  document.querySelectorAll('#section-settings .sub-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  document.querySelectorAll('#section-settings .settings-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById(`settings-panel-${tab}`);
+  if (panel) panel.classList.add('active');
+}
+
+/* ===========================================================
+   SETTINGS — CROP YEARS
+   =========================================================== */
+
+async function loadCropYearsPanel() {
+  _cropYears = await loadSheetData('CropYears');
+  renderCropYearsTable();
+}
+
+function renderCropYearsTable() {
+  const container = document.getElementById('crop-years-table-container');
+  if (!container) return;
+
+  const sorted = [...(_cropYears || [])].sort((a, b) => b.Label.localeCompare(a.Label));
+
+  if (sorted.length === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">&#128197;</div>
+      <p>No crop years yet. Click "+ Add Crop Year" to get started.</p>
+    </div>`;
+    return;
+  }
+
+  const rows = sorted.map(cy => {
+    const isActive = cy.Active !== 'FALSE' && cy.Active !== 'false' && cy.Active !== '0';
+    return `
+    <tr>
+      <td><strong>${escapeHtml(cy.Label)}</strong></td>
+      <td><span class="badge ${isActive ? 'badge-active' : 'badge-inactive'}">${isActive ? 'Active' : 'Inactive'}</span></td>
+      <td class="col-actions">
+        <div class="row-actions">
+          <button class="btn btn-ghost btn-sm"
+                  onclick="toggleCropYearActive('${escapeHtml(cy.ID)}')">
+            ${isActive ? 'Deactivate' : 'Activate'}
+          </button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  container.innerHTML = `
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Label</th>
+          <th style="width:100px">Status</th>
+          <th style="width:110px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function openCropYearForm() {
+  openModal(
+    'Add Crop Year',
+    `<form id="cy-form" onsubmit="return false">
+       <div class="form-group">
+         <label class="form-label">Label <span class="req">*</span></label>
+         <input type="text" id="cy-label" class="form-control"
+                placeholder="e.g. 2026-2027" autocomplete="off">
+         <p class="form-hint">Use the format YYYY-YYYY (e.g. 2026-2027).</p>
+       </div>
+     </form>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-primary" onclick="saveCropYearForm()">Add Crop Year</button>`
+  );
+  setTimeout(() => document.getElementById('cy-label')?.focus(), 80);
+}
+
+async function saveCropYearForm() {
+  const label = document.getElementById('cy-label').value.trim();
+  if (!label) {
+    document.getElementById('cy-label').classList.add('is-error');
+    showToast('Label is required.', 'warning');
+    return;
+  }
+  document.getElementById('cy-label').classList.remove('is-error');
+
+  const existing = (_cropYears || []).find(cy => cy.Label === label);
+  if (existing) {
+    document.getElementById('cy-label').classList.add('is-error');
+    showToast(`Crop year "${label}" already exists.`, 'warning');
+    return;
+  }
+
+  const data = { ID: generateId(), Label: label, Active: 'TRUE' };
+  await doSave(false, 'CropYears', '', data, 'Crop year added.', async () => {
+    await loadCropYearsPanel();
+    await loadCropYearSelector();
+  }, 'Add Crop Year');
+}
+
+async function toggleCropYearActive(id) {
+  const cy = (_cropYears || []).find(c => c.ID === id);
+  if (!cy) return;
+  const isActive = cy.Active !== 'FALSE' && cy.Active !== 'false' && cy.Active !== '0';
+  const newActive = isActive ? 'FALSE' : 'TRUE';
+  const msg = isActive ? 'Deactivate this crop year?' : 'Activate this crop year?';
+  openConfirm(
+    isActive ? 'Deactivate Crop Year' : 'Activate Crop Year',
+    `${msg} (${cy.Label})`,
+    async () => {
+      try {
+        const updated = { ...cy, Active: newActive };
+        delete updated._row;
+        await updateSheetRow('CropYears', cy._row, updated);
+        showToast(`Crop year ${newActive === 'TRUE' ? 'activated' : 'deactivated'}.`, 'success');
+        await loadCropYearsPanel();
+        await loadCropYearSelector();
+      } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+      }
+    },
+    isActive ? 'Deactivate' : 'Activate',
+    isActive
+  );
+}
+
+/* ===========================================================
+   SETTINGS — SALESPEOPLE
+   =========================================================== */
+
+async function loadSalespeoplePanel() {
+  _salespeople = await loadSheetData('SeedSalespeople');
+  renderSalespeopleTable();
+}
+
+function renderSalespeopleTable() {
+  const container = document.getElementById('salespeople-table-container');
+  if (!container) return;
+
+  const sorted = [...(_salespeople || [])].sort((a, b) =>
+    (a.Name || '').localeCompare(b.Name || '')
+  );
+
+  if (sorted.length === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">&#9786;</div>
+      <p>No salespeople yet. Click "+ Add Salesperson" to get started.</p>
+    </div>`;
+    return;
+  }
+
+  const rows = sorted.map(sp => {
+    const isActive = sp.Active !== 'FALSE' && sp.Active !== 'false' && sp.Active !== '0';
+    return `
+    <tr>
+      <td><strong>${escapeHtml(sp.Name)}</strong></td>
+      <td><span class="badge ${isActive ? 'badge-active' : 'badge-inactive'}">${isActive ? 'Active' : 'Inactive'}</span></td>
+      <td class="col-actions">
+        <div class="row-actions">
+          <button class="btn btn-ghost btn-sm"
+                  onclick="openSalespersonFormById('${escapeHtml(sp.ID)}')">Edit</button>
+          <button class="btn btn-ghost btn-sm"
+                  onclick="toggleSalespersonActive('${escapeHtml(sp.ID)}')">
+            ${isActive ? 'Deactivate' : 'Activate'}
+          </button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  container.innerHTML = `
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th style="width:100px">Status</th>
+          <th style="width:160px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function openSalespersonFormById(id) {
+  const sp = (_salespeople || []).find(s => s.ID === id);
+  if (sp) openSalespersonForm(sp);
+}
+
+function openSalespersonForm(sp = null) {
+  const isEdit = !!sp;
+  openModal(
+    isEdit ? 'Edit Salesperson' : 'Add Salesperson',
+    `<form id="sp-form" onsubmit="return false">
+       <input type="hidden" id="sp-id"  value="${isEdit ? escapeHtml(sp.ID)   : ''}">
+       <input type="hidden" id="sp-row" value="${isEdit ? sp._row             : ''}">
+       <div class="form-group">
+         <label class="form-label">Name <span class="req">*</span></label>
+         <input type="text" id="sp-name" class="form-control"
+                value="${isEdit ? escapeHtml(sp.Name) : ''}"
+                placeholder="e.g. Jane Smith" autocomplete="off">
+       </div>
+     </form>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-primary" onclick="saveSalespersonForm()">
+       ${isEdit ? 'Save Changes' : 'Add Salesperson'}
+     </button>`
+  );
+  setTimeout(() => document.getElementById('sp-name')?.focus(), 80);
+}
+
+async function saveSalespersonForm() {
+  const id     = document.getElementById('sp-id').value;
+  const rowStr = document.getElementById('sp-row').value;
+  const name   = document.getElementById('sp-name').value.trim();
+
+  if (!name) {
+    document.getElementById('sp-name').classList.add('is-error');
+    showToast('Name is required.', 'warning');
+    return;
+  }
+  document.getElementById('sp-name').classList.remove('is-error');
+
+  const isEdit = !!id;
+  const data = { ID: id || generateId(), Name: name, Active: isEdit ? undefined : 'TRUE' };
+  if (isEdit) {
+    // Preserve existing Active value
+    const existing = (_salespeople || []).find(s => s.ID === id);
+    data.Active = existing ? existing.Active : 'TRUE';
+  }
+
+  await doSave(isEdit, 'SeedSalespeople', rowStr, data,
+    isEdit ? 'Salesperson updated.' : 'Salesperson added.',
+    () => loadSalespeoplePanel(),
+    isEdit ? 'Save Changes' : 'Add Salesperson'
+  );
+}
+
+async function toggleSalespersonActive(id) {
+  const sp = (_salespeople || []).find(s => s.ID === id);
+  if (!sp) return;
+  const isActive = sp.Active !== 'FALSE' && sp.Active !== 'false' && sp.Active !== '0';
+  const newActive = isActive ? 'FALSE' : 'TRUE';
+  openConfirm(
+    isActive ? 'Deactivate Salesperson' : 'Activate Salesperson',
+    `${isActive ? 'Deactivate' : 'Activate'} ${sp.Name}?`,
+    async () => {
+      try {
+        const updated = { ...sp, Active: newActive };
+        delete updated._row;
+        await updateSheetRow('SeedSalespeople', sp._row, updated);
+        showToast(`${sp.Name} ${newActive === 'TRUE' ? 'activated' : 'deactivated'}.`, 'success');
+        await loadSalespeoplePanel();
+      } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+      }
+    },
+    isActive ? 'Deactivate' : 'Activate',
+    isActive
+  );
+}
+
+/* ===========================================================
+   SETTINGS — SUPPLIERS (read-only from shared Vendors tab)
+   =========================================================== */
+
+async function loadSuppliersPanel() {
+  try {
+    _vendors = await loadSheetData('Vendors');
+  } catch (err) {
+    console.warn('Could not load Vendors tab:', err.message);
+    _vendors = [];
+  }
+  renderSuppliersTable();
+}
+
+function renderSuppliersTable() {
+  const container = document.getElementById('suppliers-table-container');
+  if (!container) return;
+
+  const sorted = [...(_vendors || [])].sort((a, b) =>
+    (a.VendorName || '').localeCompare(b.VendorName || '')
+  );
+
+  if (sorted.length === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">&#9749;</div>
+      <p>No vendors found. Add suppliers in the chemical system (greenwing.html).</p>
+    </div>`;
+    return;
+  }
+
+  const rows = sorted.map(v => `
+    <tr>
+      <td><strong>${escapeHtml(v.VendorName || '—')}</strong></td>
+      <td>${escapeHtml(v.Contact || '—')}</td>
+      <td>${escapeHtml(v.Phone   || '—')}</td>
+      <td>${escapeHtml(v.Notes  || '—')}</td>
+    </tr>`).join('');
+
+  container.innerHTML = `
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Vendor Name</th>
+          <th>Contact</th>
+          <th>Phone</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+/* ===========================================================
+   SEED CATALOG
+   =========================================================== */
+
+async function loadSeedCatalogSection() {
+  updateCropYearLabels();
+  const container = document.getElementById('catalog-table-container');
+  if (container) container.innerHTML = '<div class="empty-state"><p>Loading&hellip;</p></div>';
+
+  try {
+    await ensureSheetsInitialized();
+    if (!_vendors) {
+      try { _vendors = await loadSheetData('Vendors'); } catch(e) { _vendors = []; }
+    }
+    _seedCatalog = await loadSheetData('SeedCatalog');
+    populateCatalogFilters();
+    renderCatalogTable();
+  } catch (err) {
+    if (container) container.innerHTML = `<div class="empty-state"><p>Error: ${escapeHtml(err.message)}</p></div>`;
+    showToast('Error loading seed catalog: ' + err.message, 'error');
+    console.error(err);
+  }
+}
+
+function getCatalogForYear() {
+  return (_seedCatalog || []).filter(v => v.CropYear === currentCropYear);
+}
+
+function populateCatalogFilters() {
+  const yearEntries = getCatalogForYear();
+
+  const crops = [...new Set(yearEntries.map(v => v.Crop).filter(Boolean))].sort();
+  const cropSel = document.getElementById('catalog-filter-crop');
+  if (cropSel) {
+    const prev = cropSel.value;
+    cropSel.innerHTML = '<option value="">All Crops</option>' +
+      crops.map(c => `<option value="${escapeHtml(c)}"${prev === c ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('');
+  }
+
+  const suppliers = [...new Set(yearEntries.map(v => v.Supplier).filter(Boolean))].sort();
+  const supSel = document.getElementById('catalog-filter-supplier');
+  if (supSel) {
+    const prev = supSel.value;
+    supSel.innerHTML = '<option value="">All Suppliers</option>' +
+      suppliers.map(s => `<option value="${escapeHtml(s)}"${prev === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('');
+  }
+}
+
+function filterCatalog() {
+  renderCatalogTable();
+}
+
+function renderCatalogTable() {
+  const container = document.getElementById('catalog-table-container');
+  if (!container) return;
+
+  const cropFilter     = document.getElementById('catalog-filter-crop')?.value     || '';
+  const supplierFilter = document.getElementById('catalog-filter-supplier')?.value || '';
+  const showInactive   = document.getElementById('catalog-show-inactive')?.checked || false;
+
+  let entries = getCatalogForYear();
+  if (cropFilter)     entries = entries.filter(v => v.Crop     === cropFilter);
+  if (supplierFilter) entries = entries.filter(v => v.Supplier === supplierFilter);
+  if (!showInactive)  entries = entries.filter(v => v.Active !== 'FALSE' && v.Active !== 'false');
+
+  entries.sort((a, b) => {
+    const c = (a.Crop || '').localeCompare(b.Crop || '');
+    if (c !== 0) return c;
+    const b1 = (a.Brand || '').localeCompare(b.Brand || '');
+    if (b1 !== 0) return b1;
+    return (a.VarietyName || '').localeCompare(b.VarietyName || '');
+  });
+
+  if (entries.length === 0) {
+    const noData = getCatalogForYear().length === 0;
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">&#9880;</div>
+      <p>${noData
+        ? 'No varieties in catalog for ' + escapeHtml(currentCropYear) + '. Click &ldquo;+ New Variety&rdquo; to get started.'
+        : 'No varieties match the current filters.'}</p>
+    </div>`;
+    return;
+  }
+
+  const rows = entries.map(v => {
+    const isActive = v.Active !== 'FALSE' && v.Active !== 'false';
+    const nameCell = escapeHtml(v.VarietyName || '—') +
+      (v.SeedSize ? `<br><span class="text-muted">${escapeHtml(v.SeedSize)}</span>` : '');
+    return `
+    <tr class="${isActive ? '' : 'row-inactive'}">
+      <td>${escapeHtml(v.Crop     || '—')}</td>
+      <td>${escapeHtml(v.Brand    || '—')}</td>
+      <td><strong>${nameCell}</strong></td>
+      <td>${escapeHtml(v.Package  || '—')}</td>
+      <td>${escapeHtml(v.Supplier || '—')}</td>
+      <td style="text-align:right">${formatCurrency(v.CostPerBag)}</td>
+      <td style="text-align:right">${formatCurrency(v.DefaultSellPrice)}</td>
+      <td style="text-align:right">${v.CommissionPerBag ? formatCurrency(v.CommissionPerBag) : '—'}</td>
+      <td><span class="badge ${isActive ? 'badge-active' : 'badge-inactive'}">${isActive ? 'Active' : 'Inactive'}</span></td>
+      <td class="col-actions">
+        <div class="row-actions">
+          <button class="btn btn-ghost btn-sm" onclick="openVarietyFormById('${escapeHtml(v.ID)}')">Edit</button>
+          <button class="btn btn-ghost btn-sm" onclick="toggleVarietyActive('${escapeHtml(v.ID)}')">
+            ${isActive ? 'Deactivate' : 'Activate'}
+          </button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  container.innerHTML = `
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Crop</th>
+          <th>Brand</th>
+          <th>Variety Name</th>
+          <th>Package</th>
+          <th>Supplier</th>
+          <th style="text-align:right">Cost/Bag</th>
+          <th style="text-align:right">Sell Price</th>
+          <th style="text-align:right">Comm/Bag</th>
+          <th style="width:80px">Status</th>
+          <th style="width:160px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function openVarietyFormById(id) {
+  const v = (_seedCatalog || []).find(v => v.ID === id);
+  if (v) openVarietyForm(v);
+}
+
+function openVarietyForm(variety = null) {
+  const isEdit = !!variety;
+
+  const toDollars = cents => (cents && parseInt(cents)) ? (parseInt(cents) / 100).toFixed(2) : '';
+
+  const suppliers = [...(_vendors || [])].sort((a, b) => (a.VendorName || '').localeCompare(b.VendorName || ''));
+  const supplierOptions = suppliers.map(s =>
+    `<option value="${escapeHtml(s.VendorName)}"${isEdit && variety.Supplier === s.VendorName ? ' selected' : ''}>${escapeHtml(s.VendorName)}</option>`
+  ).join('');
+  const noSupplierHint = suppliers.length === 0
+    ? '<p class="form-hint" style="color:#b87624">No suppliers found. Add vendors in the chemical system first.</p>' : '';
+
+  openModal(
+    isEdit ? 'Edit Variety' : 'New Variety',
+    `<form id="variety-form" onsubmit="return false">
+       <input type="hidden" id="var-id"  value="${isEdit ? escapeHtml(variety.ID)   : ''}">
+       <input type="hidden" id="var-row" value="${isEdit ? variety._row             : ''}">
+       <div class="form-row">
+         <div class="form-group">
+           <label class="form-label">Crop <span class="req">*</span></label>
+           <input type="text" id="var-crop" class="form-control"
+                  value="${isEdit ? escapeHtml(variety.Crop || '') : ''}"
+                  placeholder="e.g. Corn, Soybeans" autocomplete="off">
+         </div>
+         <div class="form-group">
+           <label class="form-label">Brand <span class="req">*</span></label>
+           <input type="text" id="var-brand" class="form-control"
+                  value="${isEdit ? escapeHtml(variety.Brand || '') : ''}"
+                  placeholder="e.g. Pioneer, Dekalb" autocomplete="off">
+         </div>
+       </div>
+       <div class="form-group">
+         <label class="form-label">Variety Name <span class="req">*</span></label>
+         <input type="text" id="var-name" class="form-control"
+                value="${isEdit ? escapeHtml(variety.VarietyName || '') : ''}"
+                placeholder="e.g. P1197AM" autocomplete="off">
+       </div>
+       <div class="form-row">
+         <div class="form-group">
+           <label class="form-label">Package</label>
+           <input type="text" id="var-package" class="form-control"
+                  value="${isEdit ? escapeHtml(variety.Package || '') : ''}"
+                  placeholder="e.g. 80,000 seeds/unit" autocomplete="off">
+         </div>
+         <div class="form-group">
+           <label class="form-label">Seed Size</label>
+           <input type="text" id="var-seedsize" class="form-control"
+                  value="${isEdit ? escapeHtml(variety.SeedSize || '') : ''}"
+                  placeholder="e.g. Large Flat" autocomplete="off">
+         </div>
+       </div>
+       <div class="form-group">
+         <label class="form-label">Supplier <span class="req">*</span></label>
+         <select id="var-supplier" class="form-control">
+           <option value="">— Select Supplier —</option>
+           ${supplierOptions}
+         </select>
+         ${noSupplierHint}
+       </div>
+       <div class="form-row">
+         <div class="form-group">
+           <label class="form-label">Cost / Bag ($) <span class="req">*</span></label>
+           <input type="number" id="var-cost" class="form-control" step="0.01" min="0"
+                  value="${isEdit ? toDollars(variety.CostPerBag) : ''}" placeholder="0.00">
+         </div>
+         <div class="form-group">
+           <label class="form-label">Sell Price / Bag ($) <span class="req">*</span></label>
+           <input type="number" id="var-sell" class="form-control" step="0.01" min="0"
+                  value="${isEdit ? toDollars(variety.DefaultSellPrice) : ''}" placeholder="0.00">
+         </div>
+       </div>
+       <div class="form-group">
+         <label class="form-label">Commission / Bag ($)</label>
+         <input type="number" id="var-commission" class="form-control" step="0.01" min="0"
+                value="${isEdit ? toDollars(variety.CommissionPerBag) : ''}"
+                placeholder="0.00" style="max-width:200px">
+         <p class="form-hint">Leave blank or 0 if no per-bag commission.</p>
+       </div>
+       <div class="form-group">
+         <label class="form-label">Notes</label>
+         <textarea id="var-notes" class="form-control" rows="2"
+                   placeholder="Optional notes">${isEdit ? escapeHtml(variety.Notes || '') : ''}</textarea>
+       </div>
+     </form>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-primary" onclick="saveVarietyForm()">${isEdit ? 'Save Changes' : 'Add Variety'}</button>`,
+    'modal-lg'
+  );
+  setTimeout(() => document.getElementById('var-crop')?.focus(), 80);
+}
+
+async function saveVarietyForm() {
+  const id     = document.getElementById('var-id').value;
+  const rowStr = document.getElementById('var-row').value;
+  const isEdit = !!id;
+
+  const crop     = document.getElementById('var-crop').value.trim();
+  const brand    = document.getElementById('var-brand').value.trim();
+  const name     = document.getElementById('var-name').value.trim();
+  const supplier = document.getElementById('var-supplier').value;
+  const costStr  = document.getElementById('var-cost').value.trim();
+  const sellStr  = document.getElementById('var-sell').value.trim();
+
+  let valid = true;
+  [['var-crop', crop], ['var-brand', brand], ['var-name', name],
+   ['var-supplier', supplier], ['var-cost', costStr], ['var-sell', sellStr]
+  ].forEach(([elId, val]) => {
+    const el = document.getElementById(elId);
+    if (!val) { el?.classList.add('is-error'); valid = false; }
+    else        el?.classList.remove('is-error');
+  });
+  if (!valid) { showToast('Please fill in all required fields.', 'warning'); return; }
+
+  const toCents = str => Math.round(parseFloat(str) * 100);
+  const commStr = document.getElementById('var-commission').value.trim();
+
+  const existingActive = isEdit
+    ? ((_seedCatalog || []).find(v => v.ID === id)?.Active || 'TRUE')
+    : 'TRUE';
+
+  const data = {
+    ID:               id || generateId(),
+    CropYear:         currentCropYear,
+    Crop:             crop,
+    Brand:            brand,
+    VarietyName:      name,
+    Package:          document.getElementById('var-package').value.trim(),
+    SeedSize:         document.getElementById('var-seedsize').value.trim(),
+    Supplier:         supplier,
+    CostPerBag:       toCents(costStr),
+    DefaultSellPrice: toCents(sellStr),
+    CommissionPerBag: commStr ? toCents(commStr) : 0,
+    Active:           existingActive,
+    Notes:            document.getElementById('var-notes').value.trim(),
+  };
+
+  await doSave(isEdit, 'SeedCatalog', rowStr, data,
+    isEdit ? 'Variety updated.' : 'Variety added.',
+    async () => {
+      _seedCatalog = await loadSheetData('SeedCatalog');
+      populateCatalogFilters();
+      renderCatalogTable();
+    },
+    isEdit ? 'Save Changes' : 'Add Variety'
+  );
+}
+
+async function toggleVarietyActive(id) {
+  const v = (_seedCatalog || []).find(v => v.ID === id);
+  if (!v) return;
+  const isActive = v.Active !== 'FALSE' && v.Active !== 'false';
+  const newActive = isActive ? 'FALSE' : 'TRUE';
+  openConfirm(
+    isActive ? 'Deactivate Variety' : 'Activate Variety',
+    `${isActive ? 'Deactivate' : 'Activate'} ${escapeHtml(v.Brand)} ${escapeHtml(v.VarietyName)}?` +
+      (isActive ? ' It will be hidden from order dropdowns.' : ''),
+    async () => {
+      try {
+        const updated = { ...v, Active: newActive };
+        delete updated._row;
+        await updateSheetRow('SeedCatalog', v._row, updated);
+        showToast(`${v.VarietyName} ${newActive === 'TRUE' ? 'activated' : 'deactivated'}.`, 'success');
+        _seedCatalog = await loadSheetData('SeedCatalog');
+        populateCatalogFilters();
+        renderCatalogTable();
+      } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+      }
+    },
+    isActive ? 'Deactivate' : 'Activate',
+    isActive
+  );
+}
+
+function copyToNextYear() {
+  const activeVarieties = getCatalogForYear().filter(v => v.Active !== 'FALSE' && v.Active !== 'false');
+  if (activeVarieties.length === 0) {
+    showToast('No active varieties to copy in ' + currentCropYear + '.', 'warning');
+    return;
+  }
+
+  const otherYears = (_cropYears || [])
+    .filter(cy => cy.Label !== currentCropYear && cy.Active !== 'FALSE' && cy.Active !== 'false')
+    .sort((a, b) => b.Label.localeCompare(a.Label));
+
+  if (otherYears.length === 0) {
+    showToast('No other active crop years available. Add a crop year in Settings first.', 'warning');
+    return;
+  }
+
+  const yearOptions = otherYears
+    .map(cy => `<option value="${escapeHtml(cy.Label)}">${escapeHtml(cy.Label)}</option>`)
+    .join('');
+  const count = activeVarieties.length;
+
+  openModal(
+    'Copy Varieties to Another Year',
+    `<div class="form-group">
+       <label class="form-label">Target Crop Year <span class="req">*</span></label>
+       <select id="copy-target-year" class="form-control" onchange="checkCopyConflicts()">
+         ${yearOptions}
+       </select>
+       <p class="form-hint">${count} active variet${count === 1 ? 'y' : 'ies'} from ${escapeHtml(currentCropYear)} will be copied. Prices carry over and can be edited after.</p>
+     </div>
+     <p id="copy-already-warning" style="display:none;color:#b87624;font-size:13px;margin-top:4px"></p>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-primary" onclick="executeCopyToYear()">Copy ${count} Variet${count === 1 ? 'y' : 'ies'}</button>`
+  );
+  setTimeout(checkCopyConflicts, 80);
+}
+
+function checkCopyConflicts() {
+  const targetYear = document.getElementById('copy-target-year')?.value;
+  if (!targetYear) return;
+  const existingCount = (_seedCatalog || []).filter(v => v.CropYear === targetYear).length;
+  const el = document.getElementById('copy-already-warning');
+  if (!el) return;
+  if (existingCount > 0) {
+    el.style.display = 'block';
+    el.textContent = `Note: ${existingCount} variet${existingCount === 1 ? 'y' : 'ies'} already exist for ${targetYear}. New copies will be added alongside them.`;
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+async function executeCopyToYear() {
+  const targetYear = document.getElementById('copy-target-year')?.value;
+  if (!targetYear) { showToast('Select a target crop year.', 'warning'); return; }
+
+  const activeVarieties = getCatalogForYear().filter(v => v.Active !== 'FALSE' && v.Active !== 'false');
+  if (activeVarieties.length === 0) { closeModal(); return; }
+
+  const btn = document.querySelector('#modal-footer .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Copying\u2026'; }
+
+  try {
+    const headers = HEADERS.SeedCatalog;
+    const rows = activeVarieties.map(v => {
+      const entry = {
+        ID: generateId(), CropYear: targetYear,
+        Crop: v.Crop, Brand: v.Brand, VarietyName: v.VarietyName,
+        Package: v.Package, SeedSize: v.SeedSize, Supplier: v.Supplier,
+        CostPerBag: v.CostPerBag, DefaultSellPrice: v.DefaultSellPrice,
+        CommissionPerBag: v.CommissionPerBag, Active: 'TRUE', Notes: v.Notes,
+      };
+      return headers.map(h => String(entry[h] !== undefined ? entry[h] : ''));
+    });
+
+    const range = encodeURIComponent('SeedCatalog');
+    await sheetsRequest(
+      'POST',
+      `/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+      { values: rows }
+    );
+
+    closeModal();
+    showToast(`${activeVarieties.length} variet${activeVarieties.length === 1 ? 'y' : 'ies'} copied to ${targetYear}.`, 'success');
+    _seedCatalog = await loadSheetData('SeedCatalog');
+    populateCatalogFilters();
+    renderCatalogTable();
+  } catch (err) {
+    showToast('Copy failed: ' + err.message, 'error');
+    console.error(err);
+    if (btn) { btn.disabled = false; btn.textContent = 'Copy Varieties'; }
+  }
+}
+
+/* ===========================================================
+   ORDERS
+   =========================================================== */
+
+async function loadOrdersSection() {
+  updateCropYearLabels();
+  _pendingLines = [];
+  const container = document.getElementById('orders-content');
+  if (container) container.innerHTML = '<div class="empty-state"><p>Loading&hellip;</p></div>';
+  try {
+    await ensureSheetsInitialized();
+    const results = await Promise.all([
+      loadSheetData('SeedOrders'),
+      loadSheetData('SeedOrderLines'),
+      loadSheetData('SeedPayments'),
+    ]);
+    _seedOrders     = results[0];
+    _seedOrderLines = results[1];
+    _seedPayments   = results[2];
+    if (!_customers) {
+      try { _customers = await loadSheetData('Customers'); } catch(e) { _customers = []; }
+    }
+    if (!_seedCatalog) {
+      _seedCatalog = await loadSheetData('SeedCatalog');
+    }
+    if (!_salespeople) {
+      _salespeople = await loadSheetData('SeedSalespeople');
+    }
+    renderOrderList();
+  } catch (err) {
+    if (container) container.innerHTML = `<div class="empty-state"><p>Error: ${escapeHtml(err.message)}</p></div>`;
+    showToast('Error loading orders: ' + err.message, 'error');
+    console.error(err);
+  }
+}
+
+// ---- Data helpers ----
+
+function getOrderTotals(orderId) {
+  const lines = (_seedOrderLines || []).filter(l => l.OrderID === orderId);
+  const totalBags  = lines.reduce((s, l) => s + (parseInt(l.Qty) || 0), 0);
+  const orderTotal = lines.reduce((s, l) => s + (parseInt(l.Qty) || 0) * (parseInt(l.PricePerBag) || 0), 0);
+  const amountPaid = (_seedPayments || [])
+    .filter(p => p.OrderID === orderId)
+    .reduce((s, p) => s + (parseInt(p.Amount) || 0), 0);
+  return { varieties: lines.length, totalBags, orderTotal, amountPaid, balanceDue: orderTotal - amountPaid };
+}
+
+function getCustomerName(id) {
+  const c = (_customers || []).find(c => c.ID === id);
+  if (!c) return id || '—';
+  return c.CustomerName || c.Name || c.Company || id || '—';
+}
+
+function getSalespersonName(id) {
+  const sp = (_salespeople || []).find(s => s.ID === id);
+  return sp ? sp.Name : (id || '—');
+}
+
+function getVarietyLabel(id) {
+  const v = (_seedCatalog || []).find(v => v.ID === id);
+  if (!v) return id || '—';
+  return [v.Crop, v.Brand, v.VarietyName].filter(Boolean).join(' — ');
+}
+
+function orderStatusBadgeHtml(status) {
+  const cls = { Open: 'badge-open', Partial: 'badge-partial', Delivered: 'badge-delivered', Cancelled: 'badge-cancelled' }[status] || 'badge-open';
+  return `<span class="badge ${cls}">${escapeHtml(status || 'Open')}</span>`;
+}
+
+// ---- List view ----
+
+function renderOrderList() {
+  const container = document.getElementById('orders-content');
+  if (!container) return;
+
+  // Preserve search/sp filter values across re-renders
+  const savedSearch = document.getElementById('order-search')?.value || '';
+  const savedSp     = document.getElementById('order-filter-sp')?.value || '';
+
+  const yearOrders = (_seedOrders || []).filter(o => o.CropYear === currentCropYear);
+
+  let filtered = yearOrders;
+  if (_orderStatusFilter) filtered = filtered.filter(o => o.Status === _orderStatusFilter);
+  if (savedSp)            filtered = filtered.filter(o => o.SalespersonID === savedSp);
+  if (savedSearch)        filtered = filtered.filter(o =>
+    getCustomerName(o.CustomerID).toLowerCase().includes(savedSearch.toLowerCase())
+  );
+
+  // Compute totals + delivery summary for sort and render
+  const withTotals = filtered.map(o => ({
+    order: o,
+    t:  getOrderTotals(o.ID),
+    ds: getDeliverySummary(o.ID),
+  }));
+
+  // Sort
+  withTotals.sort((a, b) => {
+    let aVal, bVal;
+    switch (_orderSortCol) {
+      case 'OrderDate':   aVal = a.order.OrderDate || '';                  bVal = b.order.OrderDate || ''; break;
+      case 'Customer':    aVal = getCustomerName(a.order.CustomerID);      bVal = getCustomerName(b.order.CustomerID); break;
+      case 'Salesperson': aVal = getSalespersonName(a.order.SalespersonID);bVal = getSalespersonName(b.order.SalespersonID); break;
+      case 'Varieties':   aVal = a.t.varieties;   bVal = b.t.varieties; break;
+      case 'TotalBags':   aVal = a.t.totalBags;   bVal = b.t.totalBags; break;
+      case 'OrderTotal':  aVal = a.t.orderTotal;  bVal = b.t.orderTotal; break;
+      case 'AmtPaid':     aVal = a.t.amountPaid;  bVal = b.t.amountPaid; break;
+      case 'Balance':     aVal = a.t.balanceDue;  bVal = b.t.balanceDue; break;
+      case 'Status':      aVal = a.order.Status || ''; bVal = b.order.Status || ''; break;
+      case 'Delivery':    aVal = a.ds;            bVal = b.ds; break;
+      default:            aVal = a.order.OrderDate || ''; bVal = b.order.OrderDate || '';
+    }
+    const cmp = typeof aVal === 'number' ? aVal - bVal : String(aVal).localeCompare(String(bVal));
+    return _orderSortDir === 'asc' ? cmp : -cmp;
+  });
+
+  const activeSalespeople = (_salespeople || [])
+    .filter(s => s.Active !== 'FALSE' && s.Active !== 'false')
+    .sort((a, b) => a.Name.localeCompare(b.Name));
+  const spOptions = '<option value="">All Salespeople</option>' +
+    activeSalespeople.map(s =>
+      `<option value="${escapeHtml(s.ID)}"${savedSp === s.ID ? ' selected' : ''}>${escapeHtml(s.Name)}</option>`
+    ).join('');
+
+  // Status filter tabs with counts
+  const statusTabsHtml = ['', 'Open', 'Partial', 'Delivered', 'Cancelled'].map(st => {
+    const label = st || 'All';
+    const cnt   = st ? yearOrders.filter(o => o.Status === st).length : yearOrders.length;
+    const isActive = _orderStatusFilter === st;
+    return `<button class="status-filter-tab${isActive ? ' active' : ''}"
+             onclick="setOrderStatusFilter('${st}')">${label} (${cnt})</button>`;
+  }).join('');
+
+  // Sortable header helper
+  function th(col, label, align, extraStyle) {
+    const isActive = _orderSortCol === col;
+    const arrow    = isActive ? (_orderSortDir === 'asc' ? ' &#9650;' : ' &#9660;') : ' &#8645;';
+    const styles   = [align && align !== 'left' ? `text-align:${align}` : '', extraStyle || ''].filter(Boolean).join(';');
+    return `<th class="th-sortable${isActive ? ' sort-active' : ''}"${styles ? ` style="${styles}"` : ''}
+              onclick="sortOrderList('${col}')">${label}<span class="sort-arrow">${arrow}</span></th>`;
+  }
+
+  const tableHtml = withTotals.length === 0
+    ? `<div class="empty-state">
+         <div class="empty-state-icon">&#9113;</div>
+         <p>${yearOrders.length === 0
+           ? 'No orders yet for ' + escapeHtml(currentCropYear) + '. Click &ldquo;+ New Order&rdquo; to get started.'
+           : 'No orders match the current filters.'
+         }</p>
+       </div>`
+    : `<table class="data-table">
+         <thead><tr>
+           ${th('OrderDate',   'Order Date')}
+           ${th('Customer',    'Customer')}
+           ${th('Salesperson', 'Salesperson')}
+           ${th('Varieties',   '# Varieties',  'right')}
+           ${th('TotalBags',   'Total Bags',   'right')}
+           ${th('OrderTotal',  'Order Total',  'right')}
+           ${th('AmtPaid',     'Amt Paid',     'right')}
+           ${th('Balance',     'Balance Due',  'right')}
+           ${th('Delivery',    'Delivery')}
+           ${th('Status',      'Status')}
+         </tr></thead>
+         <tbody>
+           ${withTotals.map(({ order: o, t, ds }) =>
+             `<tr style="cursor:pointer" onclick="openOrderDetail('${escapeHtml(o.ID)}')">
+               <td>${formatDate(o.OrderDate)}</td>
+               <td><strong>${escapeHtml(getCustomerName(o.CustomerID))}</strong></td>
+               <td>${escapeHtml(getSalespersonName(o.SalespersonID))}</td>
+               <td style="text-align:right">${t.varieties}</td>
+               <td style="text-align:right">${t.totalBags}</td>
+               <td style="text-align:right">${formatCurrency(t.orderTotal)}</td>
+               <td style="text-align:right">${formatCurrency(t.amountPaid)}</td>
+               <td style="text-align:right">${formatCurrency(t.balanceDue)}</td>
+               <td>${escapeHtml(ds)}</td>
+               <td>${orderStatusBadgeHtml(o.Status)}</td>
+             </tr>`).join('')}
+         </tbody>
+       </table>`;
+
+  container.innerHTML = `
+    <div class="status-filter-tabs">${statusTabsHtml}</div>
+    <div class="section-toolbar">
+      <div class="toolbar-left">
+        <input type="text" class="search-input" id="order-search"
+               placeholder="Search by customer&hellip;"
+               oninput="filterOrderList()"
+               value="${escapeHtml(savedSearch)}">
+        <select class="filter-select" id="order-filter-sp" onchange="filterOrderList()">
+          ${spOptions}
+        </select>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="exportOrderListCSV()">&#8595; Export CSV</button>
+        <button class="btn btn-primary" onclick="openNewOrderForm()">+ New Order</button>
+      </div>
+    </div>
+    ${tableHtml}`;
+}
+
+function filterOrderList() {
+  renderOrderList();
+}
+
+function setOrderStatusFilter(status) {
+  _orderStatusFilter = status;
+  renderOrderList();
+}
+
+function sortOrderList(col) {
+  if (_orderSortCol === col) {
+    _orderSortDir = _orderSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    _orderSortCol = col;
+    _orderSortDir = (col === 'OrderDate' || col === 'OrderTotal' || col === 'Balance' || col === 'AmtPaid') ? 'desc' : 'asc';
+  }
+  renderOrderList();
+}
+
+function getDeliverySummary(orderId) {
+  const lines = (_seedOrderLines || []).filter(l => l.OrderID === orderId);
+  if (lines.length === 0) return '—';
+  const done = lines.filter(l => l.DeliveryStatus === 'Delivered').length;
+  return done + '/' + lines.length + ' lines';
+}
+
+function exportOrderListCSV() {
+  const yearOrders = (_seedOrders || []).filter(o => o.CropYear === currentCropYear);
+  const searchEl   = document.getElementById('order-search');
+  const spEl       = document.getElementById('order-filter-sp');
+  const search     = searchEl ? searchEl.value.toLowerCase() : '';
+  const sp         = spEl ? spEl.value : '';
+
+  let filtered = yearOrders;
+  if (_orderStatusFilter) filtered = filtered.filter(o => o.Status === _orderStatusFilter);
+  if (sp)                 filtered = filtered.filter(o => o.SalespersonID === sp);
+  if (search)             filtered = filtered.filter(o =>
+    getCustomerName(o.CustomerID).toLowerCase().includes(search)
+  );
+
+  const rows = [['Order Date','Customer','Salesperson','# Varieties','Total Bags',
+                 'Bags Delivered','Order Total ($)','Amt Paid ($)','Balance Due ($)',
+                 'Delivery','Status']];
+
+  for (const o of filtered) {
+    const t  = getOrderTotals(o.ID);
+    const ds = getDeliverySummary(o.ID);
+    const bagsDeliv = (_seedOrderLines || [])
+      .filter(l => l.OrderID === o.ID)
+      .reduce((s, l) => s + (parseInt(l.QtyDelivered) || 0), 0);
+    rows.push([
+      o.OrderDate || '',
+      getCustomerName(o.CustomerID),
+      getSalespersonName(o.SalespersonID),
+      t.varieties,
+      t.totalBags,
+      bagsDeliv,
+      (t.orderTotal  / 100).toFixed(2),
+      (t.amountPaid  / 100).toFixed(2),
+      (t.balanceDue  / 100).toFixed(2),
+      ds,
+      o.Status || 'Open',
+    ]);
+  }
+
+  const csvEscape = cell => {
+    const s = String(cell === null || cell === undefined ? '' : cell);
+    return (s.includes(',') || s.includes('"') || s.includes('\n'))
+      ? '"' + s.replace(/"/g, '""') + '"'
+      : s;
+  };
+  const csv = rows.map(r => r.map(csvEscape).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `orders-${currentCropYear}-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast(`Exported ${filtered.length} order${filtered.length !== 1 ? 's' : ''} to CSV.`, 'success');
+}
+
+// ---- New Order Form ----
+
+function buildVarietyOptions() {
+  const active = (_seedCatalog || [])
+    .filter(v => v.CropYear === currentCropYear && v.Active !== 'FALSE' && v.Active !== 'false')
+    .sort((a, b) => {
+      const c = (a.Crop || '').localeCompare(b.Crop || '');
+      if (c !== 0) return c;
+      const b1 = (a.Brand || '').localeCompare(b.Brand || '');
+      if (b1 !== 0) return b1;
+      return (a.VarietyName || '').localeCompare(b.VarietyName || '');
+    });
+  const base = '<option value="">— Select Variety —</option>';
+  if (active.length === 0) return base;
+  return base + active.map(v =>
+    `<option value="${escapeHtml(v.ID)}" data-price="${escapeHtml(v.DefaultSellPrice || '0')}">` +
+    `${escapeHtml(v.Crop)} \u2014 ${escapeHtml(v.Brand)} ${escapeHtml(v.VarietyName)}` +
+    `</option>`
+  ).join('');
+}
+
+function openNewOrderForm() {
+  _pendingLines = [];
+  const container = document.getElementById('orders-content');
+  if (!container) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const customerOptions = '<option value="">— Select Customer —</option>' +
+    (_customers || [])
+      .slice().sort((a, b) => getCustomerName(a.ID).localeCompare(getCustomerName(b.ID)))
+      .map(c => `<option value="${escapeHtml(c.ID)}">${escapeHtml(getCustomerName(c.ID))}</option>`)
+      .join('');
+
+  const spOptions = '<option value="">— Select Salesperson —</option>' +
+    (_salespeople || [])
+      .filter(s => s.Active !== 'FALSE' && s.Active !== 'false')
+      .sort((a, b) => a.Name.localeCompare(b.Name))
+      .map(s => `<option value="${escapeHtml(s.ID)}">${escapeHtml(s.Name)}</option>`)
+      .join('');
+
+  const noCustomerHint = (_customers && _customers.length === 0)
+    ? '<p class="form-hint" style="color:#b87624">No customers found. Customers are managed in the chemical system.</p>'
+    : '';
+  const noVarietyHint = ((_seedCatalog || []).filter(v => v.CropYear === currentCropYear && v.Active !== 'FALSE').length === 0)
+    ? '<p class="form-hint" style="color:#b87624">No active varieties in catalog for ' + escapeHtml(currentCropYear) + '. Add varieties in Seed Catalog first.</p>'
+    : '';
+
+  container.innerHTML = `
+    <div class="orders-view-header">
+      <button class="btn btn-ghost btn-sm" onclick="cancelNewOrderForm()">&#8592; Back to Orders</button>
+      <span style="font-size:15px;font-weight:700;color:#2D5016;">New Order &mdash; ${escapeHtml(currentCropYear)}</span>
+    </div>
+
+    <div class="order-card">
+      <div class="order-card-header"><h3>Order Details</h3></div>
+      <div class="order-card-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Order Date <span class="req">*</span></label>
+            <input type="date" id="ord-date" class="form-control" value="${today}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Salesperson</label>
+            <select id="ord-sp" class="form-control">${spOptions}</select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Customer <span class="req">*</span></label>
+          <select id="ord-customer" class="form-control">${customerOptions}</select>
+          ${noCustomerHint}
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <textarea id="ord-notes" class="form-control" rows="2" placeholder="Optional order notes"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="order-card">
+      <div class="order-card-header"><h3>Line Items</h3></div>
+      <div class="order-card-body">
+        <div class="line-builder">
+          <div class="form-group" style="margin-bottom:10px">
+            <label class="form-label">Variety <span class="req">*</span></label>
+            <select id="li-variety" class="form-control" onchange="onVarietySelect()">
+              ${buildVarietyOptions()}
+            </select>
+            ${noVarietyHint}
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap">
+            <div class="form-group" style="margin-bottom:0;flex:0 0 88px">
+              <label class="form-label">Qty <span class="req">*</span></label>
+              <input type="number" id="li-qty" class="form-control" min="1" step="1" placeholder="0">
+            </div>
+            <div class="form-group" style="margin-bottom:0;flex:0 0 130px">
+              <label class="form-label">Price / Bag ($) <span class="req">*</span></label>
+              <input type="number" id="li-price" class="form-control" min="0" step="0.01" placeholder="0.00">
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;padding-bottom:2px;flex-wrap:wrap">
+              <label class="cb-label"><input type="checkbox" id="li-gwbox"> GW Box</label>
+              <label class="cb-label"><input type="checkbox" id="li-tender"> Tender</label>
+              <label class="cb-label"><input type="checkbox" id="li-ga"> GA</label>
+            </div>
+            <div style="padding-bottom:2px">
+              <button class="btn btn-primary" onclick="addPendingLine()">+ Add Line</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="pending-lines-container">
+          <div class="empty-state" style="padding:20px">
+            <p>No line items yet. Add at least one variety above.</p>
+          </div>
+        </div>
+
+        <div class="order-total-bar">
+          <span class="order-total-label">Order Total:</span>
+          <span class="order-total-value" id="order-running-total">$0.00</span>
+        </div>
+      </div>
+      <div class="order-form-footer">
+        <button class="btn btn-secondary" onclick="cancelNewOrderForm()">Cancel</button>
+        <button class="btn btn-primary" id="save-order-btn" onclick="saveNewOrder()">Save Order</button>
+      </div>
+    </div>`;
+}
+
+function onVarietySelect() {
+  const sel = document.getElementById('li-variety');
+  const opt = sel?.options[sel.selectedIndex];
+  const price = opt?.dataset?.price || '0';
+  const priceEl = document.getElementById('li-price');
+  if (priceEl && price) priceEl.value = (parseInt(price) / 100).toFixed(2);
+}
+
+function addPendingLine() {
+  const varietySel = document.getElementById('li-variety');
+  const qtyEl      = document.getElementById('li-qty');
+  const priceEl    = document.getElementById('li-price');
+
+  const varietyId = varietySel?.value || '';
+  const qtyStr    = (qtyEl?.value || '').trim();
+  const priceStr  = (priceEl?.value || '').trim();
+
+  let valid = true;
+  if (!varietyId) { varietySel?.classList.add('is-error'); valid = false; }
+  else             varietySel?.classList.remove('is-error');
+  if (!qtyStr || parseInt(qtyStr) < 1) { qtyEl?.classList.add('is-error'); valid = false; }
+  else                                   qtyEl?.classList.remove('is-error');
+  if (priceStr === '' || parseFloat(priceStr) < 0) { priceEl?.classList.add('is-error'); valid = false; }
+  else                                               priceEl?.classList.remove('is-error');
+
+  if (!valid) { showToast('Select a variety, enter quantity and price.', 'warning'); return; }
+
+  const variety = (_seedCatalog || []).find(v => v.ID === varietyId);
+  _pendingLines.push({
+    varietyId,
+    varietyLabel: variety
+      ? [variety.Crop, variety.Brand, variety.VarietyName].filter(Boolean).join(' \u2014 ')
+      : varietyId,
+    qty:         parseInt(qtyStr),
+    pricePerBag: Math.round(parseFloat(priceStr) * 100),
+    gwBox:   document.getElementById('li-gwbox')?.checked  || false,
+    tender:  document.getElementById('li-tender')?.checked || false,
+    ga:      document.getElementById('li-ga')?.checked     || false,
+  });
+
+  // Reset line builder inputs (keep variety selection)
+  if (qtyEl) qtyEl.value = '';
+  ['li-gwbox', 'li-tender', 'li-ga'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.checked = false;
+  });
+
+  renderPendingLines();
+}
+
+function removePendingLine(idx) {
+  _pendingLines.splice(idx, 1);
+  renderPendingLines();
+}
+
+function renderPendingLines() {
+  const container = document.getElementById('pending-lines-container');
+  const totalEl   = document.getElementById('order-running-total');
+  if (!container) return;
+
+  const total = _pendingLines.reduce((s, l) => s + l.qty * l.pricePerBag, 0);
+  if (totalEl) totalEl.textContent = formatCurrency(total);
+
+  if (_pendingLines.length === 0) {
+    container.innerHTML = `<div class="empty-state" style="padding:20px">
+      <p>No line items yet. Add at least one variety above.</p>
+    </div>`;
+    return;
+  }
+
+  const rows = _pendingLines.map((l, i) => `
+    <tr>
+      <td>${escapeHtml(l.varietyLabel)}</td>
+      <td style="text-align:right">${l.qty}</td>
+      <td style="text-align:right">${formatCurrency(l.pricePerBag)}</td>
+      <td style="text-align:right">${formatCurrency(l.qty * l.pricePerBag)}</td>
+      <td style="text-align:center">${l.gwBox  ? '&#10003;' : '&mdash;'}</td>
+      <td style="text-align:center">${l.tender ? '&#10003;' : '&mdash;'}</td>
+      <td style="text-align:center">${l.ga     ? '&#10003;' : '&mdash;'}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="removePendingLine(${i})">Remove</button></td>
+    </tr>`).join('');
+
+  container.innerHTML = `
+    <table class="pending-lines-table">
+      <thead>
+        <tr>
+          <th>Variety</th>
+          <th style="text-align:right">Qty</th>
+          <th style="text-align:right">Price/Bag</th>
+          <th style="text-align:right">Subtotal</th>
+          <th style="text-align:center">GW Box</th>
+          <th style="text-align:center">Tender</th>
+          <th style="text-align:center">GA</th>
+          <th style="width:80px"></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function cancelNewOrderForm() {
+  _pendingLines = [];
+  renderOrderList();
+}
+
+async function saveNewOrder() {
+  const dateVal = (document.getElementById('ord-date')?.value || '').trim();
+  const custId  = document.getElementById('ord-customer')?.value || '';
+  const spId    = document.getElementById('ord-sp')?.value || '';
+  const notes   = (document.getElementById('ord-notes')?.value || '').trim();
+
+  let valid = true;
+  if (!dateVal) { document.getElementById('ord-date')?.classList.add('is-error'); valid = false; }
+  else           document.getElementById('ord-date')?.classList.remove('is-error');
+  if (!custId)  { document.getElementById('ord-customer')?.classList.add('is-error'); valid = false; }
+  else           document.getElementById('ord-customer')?.classList.remove('is-error');
+  if (!valid) { showToast('Order date and customer are required.', 'warning'); return; }
+  if (_pendingLines.length === 0) { showToast('Add at least one line item.', 'warning'); return; }
+
+  const btn = document.getElementById('save-order-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
+
+  try {
+    const orderId = generateId();
+    await appendSheetRow('SeedOrders', {
+      ID: orderId, CropYear: currentCropYear, OrderDate: dateVal,
+      CustomerID: custId, SalespersonID: spId, Status: 'Open', Notes: notes,
+    });
+
+    // Batch-append all line items in one request
+    const lineHeaders = HEADERS.SeedOrderLines;
+    const lineValues  = _pendingLines.map(l => {
+      const lineData = {
+        ID: generateId(), OrderID: orderId,
+        VarietyOrdered: l.varietyId, VarietyFulfilled: l.varietyId, SubNote: '',
+        Qty: String(l.qty), PricePerBag: String(l.pricePerBag),
+        GWBox: l.gwBox ? 'TRUE' : 'FALSE', Tender: l.tender ? 'TRUE' : 'FALSE', GA: l.ga ? 'TRUE' : 'FALSE',
+        DeliveryStatus: 'Pending', QtyDelivered: '0', DeliveryDate: '',
+      };
+      return lineHeaders.map(h => String(lineData[h] !== undefined ? lineData[h] : ''));
+    });
+    await appendRows('SeedOrderLines', lineValues);
+
+    showToast('Order saved.', 'success');
+    _pendingLines = [];
+
+    // Reload and show detail
+    const results = await Promise.all([
+      loadSheetData('SeedOrders'),
+      loadSheetData('SeedOrderLines'),
+    ]);
+    _seedOrders     = results[0];
+    _seedOrderLines = results[1];
+    renderOrderDetail(orderId);
+
+  } catch (err) {
+    showToast('Error saving order: ' + err.message, 'error');
+    console.error(err);
+    if (btn) { btn.disabled = false; btn.textContent = 'Save Order'; }
+  }
+}
+
+// ---- Order Detail View ----
+
+function openOrderDetail(orderId) {
+  renderOrderDetail(orderId);
+}
+
+function renderOrderDetail(orderId) {
+  const container = document.getElementById('orders-content');
+  if (!container) return;
+
+  const order = (_seedOrders || []).find(o => o.ID === orderId);
+  if (!order) {
+    container.innerHTML = '<div class="empty-state"><p>Order not found.</p></div>';
+    return;
+  }
+
+  const lines = (_seedOrderLines || []).filter(l => l.OrderID === orderId);
+  const t = getOrderTotals(orderId);
+
+  const lineRows = lines.map(l => {
+    const v = (_seedCatalog || []).find(v => v.ID === l.VarietyOrdered);
+    const vLabel = v
+      ? [v.Crop, v.Brand, v.VarietyName].filter(Boolean).join(' \u2014 ')
+      : (l.VarietyOrdered || '—');
+    const subtotal     = (parseInt(l.Qty) || 0) * (parseInt(l.PricePerBag) || 0);
+    const qtyDelivered = parseInt(l.QtyDelivered) || 0;
+    const totalQty     = parseInt(l.Qty) || 0;
+    const delivInfo    = qtyDelivered + '/' + totalQty;
+    const delivBadge   = l.DeliveryStatus === 'Delivered'
+      ? '<span class="badge badge-delivered">Delivered ' + delivInfo + '</span>'
+      : l.DeliveryStatus === 'Partial'
+      ? '<span class="badge badge-partial">Partial ' + delivInfo + '</span>'
+      : '<span class="badge badge-open">Pending ' + delivInfo + '</span>';
+    const isSub  = l.VarietyFulfilled && l.VarietyFulfilled !== l.VarietyOrdered;
+    const subInfo = isSub
+      ? '<br><span class="text-muted">Sub: ' + escapeHtml(getVarietyLabel(l.VarietyFulfilled)) +
+        (l.SubNote ? ' \u2014 ' + escapeHtml(l.SubNote) : '') + '</span>'
+      : '';
+    return `<tr>
+      <td>${escapeHtml(vLabel)}${subInfo}</td>
+      <td style="text-align:right">${escapeHtml(l.Qty || '0')}</td>
+      <td style="text-align:right">${formatCurrency(l.PricePerBag)}</td>
+      <td style="text-align:right">${formatCurrency(subtotal)}</td>
+      <td style="text-align:center">${l.GWBox  === 'TRUE' ? '&#10003;' : '&mdash;'}</td>
+      <td style="text-align:center">${l.Tender === 'TRUE' ? '&#10003;' : '&mdash;'}</td>
+      <td style="text-align:center">${l.GA     === 'TRUE' ? '&#10003;' : '&mdash;'}</td>
+      <td>${delivBadge}</td>
+    </tr>`;
+  }).join('');
+
+  const isCancelled       = order.Status === 'Cancelled';
+  const hasDeliveredLines = lines.some(l => (parseInt(l.QtyDelivered) || 0) > 0);
+
+  const payments     = (_seedPayments || []).filter(p => p.OrderID === orderId)
+                         .sort((a, b) => (a.Date || '').localeCompare(b.Date || ''));
+  const delivDates   = lines.map(l => l.DeliveryDate).filter(Boolean);
+  const minDelivDate = delivDates.length > 0
+    ? delivDates.reduce((m, d) => d < m ? d : m, delivDates[0]) : null;
+
+  const paymentRowsHtml = payments.length === 0
+    ? '<p style="color:#aaa;font-size:13px;font-style:italic">No payments recorded yet.</p>'
+    : '<table class="data-table"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Note</th></tr></thead><tbody>' +
+      payments.map(p => {
+        const prepay = !minDelivDate || (p.Date && p.Date < minDelivDate);
+        return '<tr>' +
+          '<td>' + formatDate(p.Date) + (prepay ? ' <span class="badge badge-prepay">Prepay</span>' : '') + '</td>' +
+          '<td>' + formatCurrency(p.Amount) + '</td>' +
+          '<td>' + escapeHtml(p.Method || '—') + '</td>' +
+          '<td>' + escapeHtml(p.Note || '—') + '</td>' +
+          '</tr>';
+      }).join('') +
+      '</tbody></table>';
+
+  const overpayHtml = t.balanceDue < 0
+    ? '<div class="overpay-warning">&#9888; Overpaid &mdash; Refund Due: ' + formatCurrency(-t.balanceDue) + '</div>'
+    : '';
+
+  container.innerHTML = `
+    <div class="orders-view-header">
+      <button class="btn btn-ghost btn-sm" onclick="backToOrderList()">&#8592; Back to Orders</button>
+      <span style="font-size:15px;font-weight:700;color:#2D5016;">Order Detail</span>
+      ${orderStatusBadgeHtml(order.Status)}
+    </div>
+
+    <div class="order-card">
+      <div class="order-card-header">
+        <h3>Order Information</h3>
+        ${!isCancelled ? `<button class="btn btn-ghost btn-sm" onclick="cancelOrder('${escapeHtml(orderId)}')">Cancel Order</button>` : ''}
+      </div>
+      <div class="order-card-body">
+        <div class="detail-grid">
+          <div>
+            <div class="detail-field-label">Order Date</div>
+            <div class="detail-field-value">${formatDate(order.OrderDate)}</div>
+          </div>
+          <div>
+            <div class="detail-field-label">Customer</div>
+            <div class="detail-field-value">${escapeHtml(getCustomerName(order.CustomerID))}</div>
+          </div>
+          <div>
+            <div class="detail-field-label">Salesperson</div>
+            <div class="detail-field-value">${escapeHtml(getSalespersonName(order.SalespersonID))}</div>
+          </div>
+          <div>
+            <div class="detail-field-label">Crop Year</div>
+            <div class="detail-field-value">${escapeHtml(order.CropYear)}</div>
+          </div>
+          ${order.Notes ? `<div style="grid-column:1/-1">
+            <div class="detail-field-label">Notes</div>
+            <div class="detail-field-value">${escapeHtml(order.Notes)}</div>
+          </div>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="order-card">
+      <div class="order-card-header">
+        <h3>Line Items (${lines.length})</h3>
+      </div>
+      <div class="order-card-body" style="padding:0">
+        ${lines.length === 0
+          ? '<div class="empty-state" style="padding:30px"><p>No line items.</p></div>'
+          : `<table class="data-table">
+               <thead>
+                 <tr>
+                   <th>Variety</th>
+                   <th style="text-align:right">Qty</th>
+                   <th style="text-align:right">Price/Bag</th>
+                   <th style="text-align:right">Subtotal</th>
+                   <th style="text-align:center">GW Box</th>
+                   <th style="text-align:center">Tender</th>
+                   <th style="text-align:center">GA</th>
+                   <th>Delivery</th>
+                 </tr>
+               </thead>
+               <tbody>${lineRows}</tbody>
+             </table>`}
+      </div>
+    </div>
+
+    <div class="order-card">
+      <div class="order-card-header">
+        <h3>Payments</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${!isCancelled && order.Status !== 'Delivered'
+            ? `<button class="btn btn-secondary btn-sm" onclick="openDeliveryModal('${escapeHtml(orderId)}')">&#128666; Record Delivery</button>`
+            : ''}
+          ${!isCancelled && hasDeliveredLines
+            ? `<button class="btn btn-warning btn-sm" onclick="openReturnModal('${escapeHtml(orderId)}')">&#8617; Record Return</button>`
+            : ''}
+          <button class="btn btn-primary btn-sm" onclick="openPaymentModal('${escapeHtml(orderId)}')">+ Record Payment</button>
+        </div>
+      </div>
+      <div class="order-card-body">
+        ${paymentRowsHtml}
+        <div class="payment-summary-bar" style="margin-top:16px;padding-top:16px;border-top:2px solid #eee">
+          <div>
+            <div class="psb-label">Order Total</div>
+            <div class="psb-value">${formatCurrency(t.orderTotal)}</div>
+          </div>
+          <div>
+            <div class="psb-label">Amount Paid</div>
+            <div class="psb-value">${formatCurrency(t.amountPaid)}</div>
+          </div>
+          <div>
+            <div class="psb-label">Balance Due</div>
+            <div class="psb-value ${t.balanceDue > 0 ? 'balance-due' : 'paid-off'}">${formatCurrency(Math.max(0, t.balanceDue))}</div>
+          </div>
+        </div>
+        ${overpayHtml}
+      </div>
+    </div>`;
+}
+
+async function cancelOrder(orderId) {
+  const order = (_seedOrders || []).find(o => o.ID === orderId);
+  if (!order) return;
+  openConfirm(
+    'Cancel Order',
+    'Mark this order as Cancelled? The order will remain on record but show as Cancelled.',
+    async () => {
+      try {
+        const updated = { ...order, Status: 'Cancelled' };
+        delete updated._row;
+        await updateSheetRow('SeedOrders', order._row, updated);
+        showToast('Order cancelled.', 'warning');
+        _seedOrders = await loadSheetData('SeedOrders');
+        renderOrderDetail(orderId);
+      } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+      }
+    },
+    'Cancel Order',
+    true
+  );
+}
+
+async function backToOrderList() {
+  try {
+    const results = await Promise.all([
+      loadSheetData('SeedOrders'),
+      loadSheetData('SeedOrderLines'),
+      loadSheetData('SeedPayments'),
+    ]);
+    _seedOrders     = results[0];
+    _seedOrderLines = results[1];
+    _seedPayments   = results[2];
+  } catch(e) { /* best-effort refresh */ }
+  renderOrderList();
+}
+
+/* ===========================================================
+   DELIVERY WORKFLOW
+   =========================================================== */
+
+function openDeliveryModal(orderId) {
+  const order = (_seedOrders || []).find(o => o.ID === orderId);
+  if (!order) return;
+
+  const undelivered = (_seedOrderLines || []).filter(
+    l => l.OrderID === orderId && l.DeliveryStatus !== 'Delivered'
+  );
+  if (undelivered.length === 0) {
+    showToast('All line items are already fully delivered.', 'info');
+    return;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Build sorted variety list once; used for substitution dropdowns
+  const activeVarieties = (_seedCatalog || [])
+    .filter(v => v.CropYear === order.CropYear && v.Active !== 'FALSE' && v.Active !== 'false')
+    .sort((a, b) => {
+      const c = (a.Crop || '').localeCompare(b.Crop || '');
+      if (c !== 0) return c;
+      const b1 = (a.Brand || '').localeCompare(b.Brand || '');
+      if (b1 !== 0) return b1;
+      return (a.VarietyName || '').localeCompare(b.VarietyName || '');
+    });
+
+  const lineRowsHtml = undelivered.map(l => {
+    const qty          = parseInt(l.Qty) || 0;
+    const qtyDelivered = parseInt(l.QtyDelivered) || 0;
+    const remaining    = Math.max(0, qty - qtyDelivered);
+
+    const orderedV = (_seedCatalog || []).find(v => v.ID === l.VarietyOrdered);
+    const orderedLabel = orderedV
+      ? [orderedV.Crop, orderedV.Brand, orderedV.VarietyName].filter(Boolean).join(' \u2014 ')
+      : (l.VarietyOrdered || '—');
+
+    const currentFulfilled = (l.VarietyFulfilled && l.VarietyFulfilled !== '')
+      ? l.VarietyFulfilled : l.VarietyOrdered;
+    const isSub = currentFulfilled !== l.VarietyOrdered;
+
+    const varietyOpts = activeVarieties.map(v =>
+      `<option value="${escapeHtml(v.ID)}"${v.ID === currentFulfilled ? ' selected' : ''}>`+
+      `${escapeHtml(v.Crop)} \u2014 ${escapeHtml(v.Brand)} ${escapeHtml(v.VarietyName)}`+
+      `</option>`
+    ).join('');
+
+    return `
+    <div class="deliv-line-row">
+      <div class="deliv-line-info">
+        <strong>${escapeHtml(orderedLabel)}</strong>
+        <div class="deliv-line-meta">
+          <span>Ordered: ${qty}</span>
+          <span>Previously delivered: ${qtyDelivered}</span>
+          <span>Remaining: ${remaining}</span>
+        </div>
+      </div>
+      <div class="deliv-line-fields">
+        <div class="form-group" style="flex:0 0 110px">
+          <label class="form-label">Qty Now</label>
+          <input type="number" class="form-control"
+                 id="dqty-${escapeHtml(l.ID)}"
+                 data-line-id="${escapeHtml(l.ID)}"
+                 min="0" max="${remaining}" value="${remaining}" step="1">
+        </div>
+        <div class="form-group" style="flex:1;min-width:200px">
+          <label class="form-label">Variety Fulfilled</label>
+          <select class="form-control"
+                  id="dvar-${escapeHtml(l.ID)}"
+                  data-line-id="${escapeHtml(l.ID)}"
+                  data-ordered="${escapeHtml(l.VarietyOrdered)}"
+                  onchange="onDelivVarietyChange(this)">
+            ${varietyOpts}
+          </select>
+        </div>
+        <div class="form-group" id="sub-wrap-${escapeHtml(l.ID)}"
+             style="${isSub ? '' : 'display:none'};flex:1;min-width:180px">
+          <label class="form-label">Substitution Note</label>
+          <input type="text" class="form-control"
+                 id="dsubnote-${escapeHtml(l.ID)}"
+                 value="${escapeHtml(l.SubNote || '')}"
+                 placeholder="e.g. Out of stock, similar variety">
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  openModal(
+    'Record Delivery',
+    `<form id="deliv-form" onsubmit="return false">
+       <div class="form-group" style="margin-bottom:18px">
+         <label class="form-label">Delivery Date <span class="req">*</span></label>
+         <input type="date" id="deliv-date" class="form-control"
+                value="${today}" style="max-width:200px">
+         <p class="form-hint">Applies to all line items in this delivery.</p>
+       </div>
+       <div id="deliv-lines-list">${lineRowsHtml}</div>
+     </form>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-primary" id="save-deliv-btn"
+             onclick="saveDelivery('${escapeHtml(orderId)}')">Save Delivery</button>`,
+    'modal-xl'
+  );
+}
+
+function onDelivVarietyChange(sel) {
+  const lineId  = sel.dataset.lineId;
+  const ordered = sel.dataset.ordered;
+  const wrap    = document.getElementById('sub-wrap-' + lineId);
+  if (wrap) wrap.style.display = sel.value !== ordered ? '' : 'none';
+}
+
+async function saveDelivery(orderId) {
+  const order = (_seedOrders || []).find(o => o.ID === orderId);
+  if (!order) return;
+
+  const delivDateEl = document.getElementById('deliv-date');
+  const delivDate   = delivDateEl ? delivDateEl.value : '';
+  if (!delivDate) {
+    delivDateEl?.classList.add('is-error');
+    showToast('Delivery date is required.', 'warning');
+    return;
+  }
+  delivDateEl?.classList.remove('is-error');
+
+  const undelivered = (_seedOrderLines || []).filter(
+    l => l.OrderID === orderId && l.DeliveryStatus !== 'Delivered'
+  );
+
+  // Collect form values for each line
+  const deliveryData = undelivered.map(l => {
+    const qtyNow          = parseInt(document.getElementById('dqty-' + l.ID)?.value || '0') || 0;
+    const varietyFulfilled = document.getElementById('dvar-' + l.ID)?.value || l.VarietyOrdered;
+    const subNote         = (varietyFulfilled !== l.VarietyOrdered)
+      ? (document.getElementById('dsubnote-' + l.ID)?.value.trim() || '')
+      : '';
+    return { line: l, qtyNow, varietyFulfilled, subNote };
+  });
+
+  const anyDelivered = deliveryData.some(d => d.qtyNow > 0);
+  if (!anyDelivered) {
+    showToast('Enter at least one bag quantity to deliver.', 'warning');
+    return;
+  }
+
+  const btn = document.getElementById('save-deliv-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
+
+  try {
+    // Build batch update for changed line items
+    const lineHeaders = HEADERS.SeedOrderLines;
+    const batchData   = [];
+
+    for (const { line, qtyNow, varietyFulfilled, subNote } of deliveryData) {
+      const prevFulfilled = line.VarietyFulfilled || line.VarietyOrdered;
+      const prevSubNote   = line.SubNote || '';
+      const changed = qtyNow > 0
+        || varietyFulfilled !== prevFulfilled
+        || subNote          !== prevSubNote;
+      if (!changed) continue;
+
+      const newQtyDelivered = (parseInt(line.QtyDelivered) || 0) + qtyNow;
+      const totalQty        = parseInt(line.Qty) || 0;
+      const newStatus       = qtyNow > 0
+        ? (newQtyDelivered >= totalQty ? 'Delivered' : 'Partial')
+        : line.DeliveryStatus;
+
+      const updatedLine = {
+        ...line,
+        VarietyFulfilled: varietyFulfilled || line.VarietyOrdered,
+        SubNote:          subNote,
+        QtyDelivered:     String(newQtyDelivered),
+        DeliveryDate:     qtyNow > 0 ? delivDate : (line.DeliveryDate || ''),
+        DeliveryStatus:   newStatus,
+      };
+      delete updatedLine._row;
+
+      const endCol = String.fromCharCode(64 + lineHeaders.length);
+      batchData.push({
+        range:  `SeedOrderLines!A${line._row}:${endCol}${line._row}`,
+        values: [lineHeaders.map(h => String(updatedLine[h] !== undefined ? updatedLine[h] : ''))],
+      });
+    }
+
+    if (batchData.length > 0) {
+      await batchUpdateValues(batchData);
+    }
+
+    // Reload lines and recalculate order status
+    _seedOrderLines = await loadSheetData('SeedOrderLines');
+    const allLines  = (_seedOrderLines || []).filter(l => l.OrderID === orderId);
+
+    if (allLines.length > 0 && order.Status !== 'Cancelled') {
+      const allDone  = allLines.every(l => l.DeliveryStatus === 'Delivered');
+      const anyDone  = allLines.some(l => l.DeliveryStatus === 'Delivered' || l.DeliveryStatus === 'Partial');
+      const newOrderStatus = allDone ? 'Delivered' : anyDone ? 'Partial' : order.Status;
+
+      if (newOrderStatus !== order.Status) {
+        const updatedOrder = { ...order, Status: newOrderStatus };
+        delete updatedOrder._row;
+        await updateSheetRow('SeedOrders', order._row, updatedOrder);
+        _seedOrders = await loadSheetData('SeedOrders');
+      }
+    }
+
+    // Update commission ledger: group bags delivered by supplier
+    const supplierMap = {}; // supplierName -> { bags, commissionCents }
+    for (const { line, qtyNow, varietyFulfilled } of deliveryData) {
+      if (qtyNow <= 0) continue;
+      const fulfilledId  = varietyFulfilled || line.VarietyOrdered;
+      const catalogEntry = (_seedCatalog || []).find(v => v.ID === fulfilledId);
+      if (!catalogEntry || !catalogEntry.Supplier) continue;
+      const supplier    = catalogEntry.Supplier;
+      const commPerBag  = parseInt(catalogEntry.CommissionPerBag) || 0;
+      if (!supplierMap[supplier]) supplierMap[supplier] = { bags: 0, commissionCents: 0 };
+      supplierMap[supplier].bags           += qtyNow;
+      supplierMap[supplier].commissionCents += qtyNow * commPerBag;
+    }
+    if (Object.keys(supplierMap).length > 0) {
+      await upsertCommissionsForDelivery(supplierMap, order.CropYear);
+    }
+
+    // Decrement SeedLots.QtyRemaining via FIFO (WO-07)
+    const fifoItems = deliveryData
+      .filter(d => d.qtyNow > 0)
+      .map(d => ({
+        varietyId: d.varietyFulfilled || d.line.VarietyOrdered,
+        qty:       d.qtyNow,
+      }));
+    if (fifoItems.length > 0) {
+      await decrementLotsForDelivery(fifoItems, order.CropYear);
+    }
+
+    closeModal();
+    showToast('Delivery recorded.', 'success');
+    renderOrderDetail(orderId);
+
+  } catch (err) {
+    showToast('Error recording delivery: ' + err.message, 'error');
+    console.error(err);
+    if (btn) { btn.disabled = false; btn.textContent = 'Save Delivery'; }
+  }
+}
+
+async function upsertCommissionsForDelivery(supplierMap, cropYear) {
+  // Load fresh to avoid overwriting concurrent edits
+  const commissions = await loadSheetData('SeedCommissions');
+
+  for (const [supplier, { bags, commissionCents }] of Object.entries(supplierMap)) {
+    if (bags <= 0) continue;
+    const existing = commissions.find(c => c.CropYear === cropYear && c.Supplier === supplier);
+
+    if (existing) {
+      const newBags     = (parseInt(existing.BagsDelivered) || 0) + bags;
+      const newExpected = (parseInt(existing.ExpectedTotal)  || 0) + commissionCents;
+      const newRate     = newBags > 0 ? Math.round(newExpected / newBags) : (parseInt(existing.RatePerBag) || 0);
+      const amtRcvd     = parseInt(existing.AmountReceived) || 0;
+      const updated     = {
+        ...existing,
+        BagsDelivered: String(newBags),
+        RatePerBag:    String(newRate),
+        ExpectedTotal: String(newExpected),
+        Variance:      String(newExpected - amtRcvd),
+      };
+      delete updated._row;
+      await updateSheetRow('SeedCommissions', existing._row, updated);
+    } else {
+      const newRate = bags > 0 ? Math.round(commissionCents / bags) : 0;
+      await appendSheetRow('SeedCommissions', {
+        ID:             generateId(),
+        CropYear:       cropYear,
+        Supplier:       supplier,
+        BagsDelivered:  String(bags),
+        RatePerBag:     String(newRate),
+        ExpectedTotal:  String(commissionCents),
+        AmountReceived: '0',
+        DateReceived:   '',
+        Variance:       String(commissionCents),
+        Notes:          '',
+      });
+    }
+  }
+}
+
+/* ===========================================================
+   PAYMENT MODAL
+   =========================================================== */
+
+function openPaymentModal(orderId) {
+  const today = new Date().toISOString().slice(0, 10);
+  openModal(
+    'Record Payment',
+    `<form id="pay-form" onsubmit="return false">
+       <input type="hidden" id="pay-order-id" value="${escapeHtml(orderId)}">
+       <div class="form-row">
+         <div class="form-group">
+           <label class="form-label">Date <span class="req">*</span></label>
+           <input type="date" id="pay-date" class="form-control" value="${today}">
+         </div>
+         <div class="form-group">
+           <label class="form-label">Amount ($) <span class="req">*</span></label>
+           <input type="number" id="pay-amount" class="form-control" min="0.01" step="0.01" placeholder="0.00">
+         </div>
+       </div>
+       <div class="form-group">
+         <label class="form-label">Method</label>
+         <select id="pay-method" class="form-control">
+           <option value="">— Select Method —</option>
+           <option value="Check">Check</option>
+           <option value="ACH">ACH</option>
+           <option value="Cash">Cash</option>
+           <option value="Other">Other</option>
+         </select>
+       </div>
+       <div class="form-group">
+         <label class="form-label">Note</label>
+         <input type="text" id="pay-note" class="form-control"
+                placeholder="e.g. Dec prepay for tax purposes" autocomplete="off">
+       </div>
+     </form>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-primary" onclick="savePaymentForm()">Record Payment</button>`
+  );
+  setTimeout(() => document.getElementById('pay-amount')?.focus(), 80);
+}
+
+async function savePaymentForm() {
+  const orderId   = document.getElementById('pay-order-id').value;
+  const dateVal   = (document.getElementById('pay-date')?.value   || '').trim();
+  const amountStr = (document.getElementById('pay-amount')?.value || '').trim();
+  const method    = document.getElementById('pay-method')?.value  || '';
+  const note      = (document.getElementById('pay-note')?.value   || '').trim();
+
+  let valid = true;
+  if (!dateVal) {
+    document.getElementById('pay-date')?.classList.add('is-error'); valid = false;
+  } else {
+    document.getElementById('pay-date')?.classList.remove('is-error');
+  }
+  if (!amountStr || parseFloat(amountStr) <= 0) {
+    document.getElementById('pay-amount')?.classList.add('is-error'); valid = false;
+  } else {
+    document.getElementById('pay-amount')?.classList.remove('is-error');
+  }
+  if (!valid) { showToast('Date and amount are required.', 'warning'); return; }
+
+  const amountCents = Math.round(parseFloat(amountStr) * 100);
+
+  const btn = document.querySelector('#modal-footer .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
+
+  try {
+    await appendSheetRow('SeedPayments', {
+      ID:      generateId(),
+      OrderID: orderId,
+      Date:    dateVal,
+      Amount:  String(amountCents),
+      Method:  method,
+      Note:    note,
+    });
+    _seedPayments = await loadSheetData('SeedPayments');
+    closeModal();
+    showToast('Payment recorded.', 'success');
+    renderOrderDetail(orderId);
+  } catch (err) {
+    showToast('Error saving payment: ' + err.message, 'error');
+    console.error(err);
+    if (btn) { btn.disabled = false; btn.textContent = 'Record Payment'; }
+  }
+}
+
+/* ===========================================================
+   SAVE HELPER
+   =========================================================== */
+
+async function doSave(isEdit, tabName, rowStr, data, successMsg, reloadFn, btnLabel) {
+  const btn = document.querySelector('#modal-footer .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+  try {
+    if (isEdit) {
+      await updateSheetRow(tabName, parseInt(rowStr), data);
+    } else {
+      await appendSheetRow(tabName, data);
+    }
+    closeModal();
+    showToast(successMsg, 'success');
+    await reloadFn();
+  } catch (err) {
+    showToast('Error saving: ' + err.message, 'error');
+    console.error(err);
+    if (btn) { btn.disabled = false; btn.textContent = btnLabel; }
+  }
+}
+
+/* ===========================================================
+   MODAL HELPERS
+   =========================================================== */
+
+function openModal(title, bodyHtml, footerHtml = '', extraClass = '') {
+  const box = document.getElementById('modal-box');
+  box.className = 'modal' + (extraClass ? ' ' + extraClass : '');
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML    = bodyHtml;
+  document.getElementById('modal-footer').innerHTML  = footerHtml;
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').style.display = 'none';
+}
+
+function closeModalOnOverlay(e) {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+}
+
+function openConfirm(title, message, onOk, okLabel = 'Confirm', isDanger = false) {
+  _confirmCallback = onOk;
+  document.getElementById('confirm-title').textContent   = title;
+  document.getElementById('confirm-message').textContent = message;
+  const btn = document.getElementById('confirm-ok-btn');
+  btn.textContent = okLabel;
+  btn.className   = `btn ${isDanger ? 'btn-danger' : 'btn-primary'}`;
+  document.getElementById('confirm-overlay').style.display = 'flex';
+}
+
+function closeConfirm() {
+  document.getElementById('confirm-overlay').style.display = 'none';
+  _confirmCallback = null;
+}
+
+function closeConfirmOnOverlay(e) {
+  if (e.target === document.getElementById('confirm-overlay')) closeConfirm();
+}
+
+async function executeConfirm() {
+  if (!_confirmCallback) return;
+  const cb = _confirmCallback;
+  closeConfirm();
+  await cb();
+}
+
+/* ===========================================================
+   AUTHENTICATION
+   =========================================================== */
+
+function signIn() {
+  if (!gisReady) {
+    if (typeof google !== 'undefined') { onGISLoad(); }
+    if (!gisReady) {
+      showToast('Authentication library still loading. Please try again.', 'warning');
+      return;
+    }
+  }
+  if (CLIENT_ID === 'YOUR_OAUTH_CLIENT_ID_HERE') {
+    showToast('OAuth Client ID not configured.', 'error');
+    return;
+  }
+  const btn = document.getElementById('sign-in-btn');
+  if (btn) btn.disabled = true;
+  setLoading(true, 'Signing in…');
+  tokenClient.requestAccessToken({ prompt: 'select_account' });
+}
+
+async function handleTokenResponse(response) {
+  const btn = document.getElementById('sign-in-btn');
+  if (btn) btn.disabled = false;
+
+  if (response.error) { handleAuthError(response); return; }
+
+  accessToken = response.access_token;
+  if (gapiReady) gapi.client.setToken({ access_token: accessToken });
+
+  try {
+    setLoading(true, 'Loading profile…');
+    const profile = await fetchUserProfile(accessToken);
+    currentUser = {
+      name:     profile.name  || profile.email || 'User',
+      email:    profile.email || '',
+      photoUrl: profile.picture || '',
+      initials: getInitials(profile.name || profile.email || '?'),
+    };
+    renderUserInfo();
+    showAppShell();
+    setLoading(false);
+    showToast(`Welcome, ${currentUser.name.split(' ')[0]}!`, 'success');
+    testSheetConnection();
+  } catch (err) {
+    setLoading(false);
+    console.error('Profile fetch error:', err);
+    currentUser = { name: 'User', email: '', photoUrl: '', initials: '?' };
+    renderUserInfo();
+    showAppShell();
+    showToast('Signed in, but could not load your Google profile.', 'warning');
+    testSheetConnection();
+  }
+}
+
+function handleAuthError(err) {
+  setLoading(false);
+  const btn = document.getElementById('sign-in-btn');
+  if (btn) btn.disabled = false;
+
+  let msg = 'Sign-in failed. Please try again.';
+  if (err?.type === 'popup_closed')         msg = 'Sign-in cancelled.';
+  if (err?.type === 'popup_failed_to_open') msg = 'Pop-up blocked. Allow pop-ups for this page.';
+  if (err?.type === 'access_denied')        msg = 'Access denied — permissions not granted.';
+  if (!msg && err?.message)                 msg = 'Sign-in error: ' + err.message;
+  showToast(msg, 'error');
+}
+
+async function fetchUserProfile(token) {
+  const resp = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+    headers: { Authorization: 'Bearer ' + token },
+  });
+  if (!resp.ok) throw new Error(`userinfo returned ${resp.status}`);
+  return resp.json();
+}
+
+function signOut() {
+  if (accessToken && typeof google !== 'undefined') {
+    google.accounts.oauth2.revoke(accessToken, () => {});
+  }
+  accessToken        = null;
+  currentUser        = null;
+  _sheetsInitialized = false;
+  _cropYears         = null;
+  _salespeople       = null;
+  _vendors           = null;
+  _seedCatalog       = null;
+  _seedOrders        = null;
+  _seedOrderLines    = null;
+  _customers         = null;
+  _seedPayments      = null;
+  _seedCommissions   = null;
+  _pendingLines      = [];
+  _confirmCallback   = null;
+  if (gapiReady) gapi.client.setToken(null);
+  showLoginScreen();
+  setConnStatus('checking', 'Not connected');
+  showToast('Signed out.', 'info');
+}
+
+/* ===========================================================
+   GOOGLE SHEETS CONNECTION TEST
+   =========================================================== */
+
+async function testSheetConnection() {
+  setConnStatus('checking', 'Connecting…');
+
+  if (SHEET_ID === 'YOUR_SHEET_ID_HERE') {
+    setConnStatus('error', 'Sheet ID not set');
+    showToast('Sheet ID not configured.', 'warning');
+    return;
+  }
+  if (!accessToken) { setConnStatus('error', 'Not authenticated'); return; }
+
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(SHEET_ID)}?fields=spreadsheetId,properties.title`;
+    const resp = await fetch(url, { headers: { Authorization: 'Bearer ' + accessToken } });
+
+    if (resp.status === 200) {
+      const data = await resp.json();
+      setConnStatus('connected', data.properties?.title || 'Connected');
+      showToast('Connected to Google Sheet.', 'success');
+      // Initialize seed tabs in background, then load crop year selector
+      initializeSheets()
+        .then(() => {
+          _sheetsInitialized = true;
+          return loadCropYearSelector();
+        })
+        .catch(err => console.warn('Sheet init warning:', err.message));
+    } else if (resp.status === 401) {
+      setConnStatus('error', 'Token expired');
+      showToast('Session expired. Please sign out and sign back in.', 'error');
+    } else if (resp.status === 403) {
+      setConnStatus('error', 'Access denied');
+      showToast('Access denied. Ask the sheet owner to share it with your Google account.', 'error');
+    } else if (resp.status === 404) {
+      setConnStatus('error', 'Sheet not found');
+      showToast('Sheet not found. Verify the SHEET_ID constant is correct.', 'error');
+    } else {
+      setConnStatus('error', `Error ${resp.status}`);
+      showToast(`Sheets API error (${resp.status}).`, 'error');
+    }
+  } catch (err) {
+    setConnStatus('error', 'Network error');
+    showToast('Network error — check your internet connection.', 'error');
+    console.error('Sheet connection error:', err);
+  }
+}
+
+/* ===========================================================
+   INVENTORY SECTION
+   =========================================================== */
+
+function showInvTab(tab) {
+  document.querySelectorAll('#section-inventory .sub-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  document.querySelectorAll('#section-inventory .settings-panel').forEach(p => p.classList.remove('active'));
+  const key = tab.replace('inv-', '');
+  const panel = document.getElementById('inv-panel-' + key);
+  if (panel) panel.classList.add('active');
+}
+
+async function loadInventorySection() {
+  updateCropYearLabels();
+  setLoading(true, 'Loading inventory\u2026');
+  try {
+    await ensureSheetsInitialized();
+    const [lots, catalog, orderLines] = await Promise.all([
+      loadSheetData('SeedLots'),
+      loadSheetData('SeedCatalog'),
+      loadSheetData('SeedOrderLines'),
+    ]);
+    _seedLots       = lots;
+    _seedCatalog    = catalog;
+    _seedOrderLines = orderLines;
+    if (!_seedOrders) {
+      _seedOrders = await loadSheetData('SeedOrders');
+    }
+    renderInventoryView();
+  } catch (err) {
+    const c = document.getElementById('inv-summary-container');
+    if (c) c.innerHTML = `<div class="empty-state"><p>Error: ${escapeHtml(err.message)}</p></div>`;
+    showToast('Error loading inventory: ' + err.message, 'error');
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function renderInventoryView() {
+  renderInventorySummary();
+  renderInventoryLots();
+}
+
+function renderInventorySummary() {
+  const container = document.getElementById('inv-summary-container');
+  if (!container) return;
+
+  const cy          = currentCropYear;
+  const cyVarieties = (_seedCatalog || []).filter(v => v.CropYear === cy);
+  const yearLots    = (_seedLots    || []).filter(l => l.CropYear === cy);
+
+  // Bags delivered per variety: QtyDelivered from non-cancelled order lines
+  const cyOrderIds = new Set(
+    (_seedOrders || []).filter(o => o.CropYear === cy && o.Status !== 'Cancelled').map(o => o.ID)
+  );
+  const activeLines = (_seedOrderLines || []).filter(l => cyOrderIds.has(l.OrderID));
+
+  if (cyVarieties.length === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">&#11019;</div>
+      <p>No varieties in catalog for ${escapeHtml(cy)}. Add varieties in the Seed Catalog section.</p>
+    </div>`;
+    const infoEl = document.getElementById('inv-summary-info');
+    if (infoEl) infoEl.innerHTML = '';
+    return;
+  }
+
+  const sorted = cyVarieties.slice().sort((a, b) => {
+    const cropCmp = (a.Crop || '').localeCompare(b.Crop || '');
+    if (cropCmp !== 0) return cropCmp;
+    return (a.VarietyName || '').localeCompare(b.VarietyName || '');
+  });
+
+  let totReceived = 0, totDelivered = 0, totRemaining = 0;
+  let zeroCount = 0, lowCount = 0;
+
+  const rows = sorted.map(v => {
+    const vLots     = yearLots.filter(l => l.VarietyID === v.ID);
+    const received  = vLots.reduce((s, l) => s + (parseInt(l.QtyReceived)  || 0), 0);
+    const remaining = vLots.reduce((s, l) => s + (parseInt(l.QtyRemaining) || 0), 0);
+    const delivered = activeLines
+      .filter(l => (l.VarietyFulfilled || l.VarietyOrdered) === v.ID)
+      .reduce((s, l) => s + (parseInt(l.QtyDelivered) || 0), 0);
+
+    totReceived  += received;
+    totDelivered += delivered;
+    totRemaining += remaining;
+
+    const isZero = received > 0 && remaining === 0;
+    const isLow  = remaining > 0 && remaining < 10;
+    if (isZero) zeroCount++;
+    if (isLow)  lowCount++;
+
+    const cls   = isZero ? 'inv-row-zero' : isLow ? 'inv-row-low' : '';
+    const badge = isZero
+      ? '<span class="inv-badge-zero">Out of stock</span>'
+      : isLow
+      ? '<span class="inv-badge-low">Low stock</span>'
+      : '';
+
+    const label = [v.Crop, v.Brand, v.VarietyName].filter(Boolean).join(' \u2014 ');
+    const meta  = [v.Package, v.SeedSize].filter(Boolean).join(' \u00b7 ');
+    return `<tr class="${cls}">
+      <td>
+        <strong>${escapeHtml(label)}</strong>
+        ${meta ? `<br><span class="text-muted">${escapeHtml(meta)}</span>` : ''}
+      </td>
+      <td>${escapeHtml(v.Supplier || '\u2014')}</td>
+      <td style="text-align:right;font-weight:600">${received.toLocaleString()}</td>
+      <td style="text-align:right;font-weight:600">${delivered.toLocaleString()}</td>
+      <td style="text-align:right;font-weight:700">${remaining.toLocaleString()}${badge}</td>
+    </tr>`;
+  });
+
+  const infoEl = document.getElementById('inv-summary-info');
+  if (infoEl) {
+    const parts = [];
+    if (zeroCount > 0) parts.push(`<span style="color:#a02020;font-weight:700">${zeroCount} out of stock</span>`);
+    if (lowCount  > 0) parts.push(`<span style="color:#8a6200;font-weight:700">${lowCount} low stock</span>`);
+    infoEl.innerHTML = parts.length > 0 ? parts.join('&nbsp;&nbsp;&middot;&nbsp;&nbsp;') : '';
+  }
+
+  container.innerHTML = `
+    <table class="data-table">
+      <thead><tr>
+        <th>Variety</th>
+        <th>Supplier</th>
+        <th style="text-align:right">Bags Received</th>
+        <th style="text-align:right">Bags Delivered</th>
+        <th style="text-align:right">Bags Remaining</th>
+      </tr></thead>
+      <tbody>${rows.join('')}</tbody>
+      <tfoot>
+        <tr style="background:#f9f9f9;border-top:2px solid #e0e0e0">
+          <td colspan="2" style="padding:10px 14px;font-size:11px;font-weight:700;
+              text-transform:uppercase;letter-spacing:0.6px;color:#666">Total</td>
+          <td style="text-align:right;padding:10px 14px;font-weight:700">${totReceived.toLocaleString()}</td>
+          <td style="text-align:right;padding:10px 14px;font-weight:700">${totDelivered.toLocaleString()}</td>
+          <td style="text-align:right;padding:10px 14px;font-weight:700">${totRemaining.toLocaleString()}</td>
+        </tr>
+      </tfoot>
+    </table>`;
+}
+
+function renderInventoryLots() {
+  const container = document.getElementById('inv-lots-container');
+  if (!container) return;
+
+  const cy       = currentCropYear;
+  const yearLots = (_seedLots || [])
+    .filter(l => l.CropYear === cy)
+    .slice()
+    .sort((a, b) => (a.DateReceived || '').localeCompare(b.DateReceived || ''));
+
+  if (yearLots.length === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">&#11019;</div>
+      <p>No inbound lots recorded for ${escapeHtml(cy)}. Click &ldquo;+ Log Inbound Lot&rdquo; to add one.</p>
+    </div>`;
+    return;
+  }
+
+  const rows = yearLots.map(lot => {
+    const received  = parseInt(lot.QtyReceived)  || 0;
+    const remaining = parseInt(lot.QtyRemaining) || 0;
+    const cls = received > 0 && remaining === 0 ? 'inv-row-zero'
+              : remaining > 0 && remaining < 10  ? 'inv-row-low'
+              : '';
+    return `<tr class="${cls}">
+      <td>${formatDate(lot.DateReceived)}</td>
+      <td>${escapeHtml(getVarietyLabel(lot.VarietyID))}</td>
+      <td>${escapeHtml(lot.LotNumber || '\u2014')}</td>
+      <td style="text-align:right;font-weight:600">${received.toLocaleString()}</td>
+      <td style="text-align:right;font-weight:700">${remaining.toLocaleString()}</td>
+      <td>${escapeHtml(lot.Supplier || '\u2014')}</td>
+      <td style="font-size:12px;color:#888">${escapeHtml(lot.Notes || '')}</td>
+    </tr>`;
+  }).join('');
+
+  container.innerHTML = `
+    <table class="data-table">
+      <thead><tr>
+        <th>Date Received</th>
+        <th>Variety</th>
+        <th>Lot Number</th>
+        <th style="text-align:right">Qty Received</th>
+        <th style="text-align:right">Qty Remaining</th>
+        <th>Supplier</th>
+        <th>Notes</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function openLogLotForm() {
+  const today = new Date().toISOString().slice(0, 10);
+  const cy    = currentCropYear;
+
+  if (!_seedCatalog) {
+    showToast('Catalog not loaded yet. Please try again.', 'warning');
+    return;
+  }
+
+  const activeVarieties = (_seedCatalog || [])
+    .filter(v => v.CropYear === cy
+      && v.Active !== 'FALSE' && v.Active !== 'false' && v.Active !== '0')
+    .slice()
+    .sort((a, b) => {
+      const cropCmp = (a.Crop || '').localeCompare(b.Crop || '');
+      if (cropCmp !== 0) return cropCmp;
+      return (a.VarietyName || '').localeCompare(b.VarietyName || '');
+    });
+
+  if (activeVarieties.length === 0) {
+    showToast('No active varieties in catalog for ' + cy + '. Add varieties first.', 'warning');
+    return;
+  }
+
+  const varietyOptions = '<option value="">— Select Variety —</option>' +
+    activeVarieties.map(v => {
+      const label = [v.Crop, v.Brand, v.VarietyName].filter(Boolean).join(' \u2014 ');
+      return `<option value="${escapeHtml(v.ID)}" data-supplier="${escapeHtml(v.Supplier || '')}">${escapeHtml(label)}</option>`;
+    }).join('');
+
+  openModal(
+    'Log Inbound Lot',
+    `<form id="lot-form" onsubmit="return false">
+       <div class="form-row">
+         <div class="form-group">
+           <label class="form-label">Date Received <span class="req">*</span></label>
+           <input type="date" id="lot-date" class="form-control" value="${today}">
+         </div>
+         <div class="form-group">
+           <label class="form-label">Qty Received <span class="req">*</span></label>
+           <input type="number" id="lot-qty" class="form-control" min="1" step="1" placeholder="0">
+         </div>
+       </div>
+       <div class="form-group">
+         <label class="form-label">Variety <span class="req">*</span></label>
+         <select id="lot-variety" class="form-control" onchange="onLotVarietyChange(this)">
+           ${varietyOptions}
+         </select>
+       </div>
+       <div class="form-row">
+         <div class="form-group">
+           <label class="form-label">Supplier</label>
+           <input type="text" id="lot-supplier" class="form-control" readonly
+                  style="background:#f9f9f9;color:#666" placeholder="Auto-filled from variety">
+         </div>
+         <div class="form-group">
+           <label class="form-label">Lot Number</label>
+           <input type="text" id="lot-number" class="form-control"
+                  placeholder="Optional" autocomplete="off">
+         </div>
+       </div>
+       <div class="form-group">
+         <label class="form-label">Notes</label>
+         <textarea id="lot-notes" class="form-control" placeholder="Optional notes"></textarea>
+       </div>
+     </form>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-primary" onclick="saveLogLotForm()">Log Lot</button>`
+  );
+  setTimeout(() => document.getElementById('lot-qty')?.focus(), 80);
+}
+
+function onLotVarietyChange(sel) {
+  const supplier = sel.options[sel.selectedIndex]?.dataset.supplier || '';
+  const el = document.getElementById('lot-supplier');
+  if (el) el.value = supplier;
+}
+
+async function saveLogLotForm() {
+  const dateVal   = (document.getElementById('lot-date')?.value     || '').trim();
+  const varietyId = (document.getElementById('lot-variety')?.value  || '').trim();
+  const qtyStr    = (document.getElementById('lot-qty')?.value      || '').trim();
+  const lotNum    = (document.getElementById('lot-number')?.value   || '').trim();
+  const supplier  = (document.getElementById('lot-supplier')?.value || '').trim();
+  const notes     = (document.getElementById('lot-notes')?.value    || '').trim();
+
+  ['lot-date', 'lot-variety', 'lot-qty'].forEach(id => {
+    document.getElementById(id)?.classList.remove('is-error');
+  });
+
+  let valid = true;
+  if (!dateVal)   { document.getElementById('lot-date')?.classList.add('is-error');    valid = false; }
+  if (!varietyId) { document.getElementById('lot-variety')?.classList.add('is-error'); valid = false; }
+  const qty = parseInt(qtyStr);
+  if (!qtyStr || isNaN(qty) || qty < 1) {
+    document.getElementById('lot-qty')?.classList.add('is-error'); valid = false;
+  }
+  if (!valid) { showToast('Date, variety, and quantity are required.', 'warning'); return; }
+
+  const btn = document.querySelector('#modal-footer .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
+
+  try {
+    await appendSheetRow('SeedLots', {
+      ID:           generateId(),
+      CropYear:     currentCropYear,
+      DateReceived: dateVal,
+      VarietyID:    varietyId,
+      LotNumber:    lotNum,
+      QtyReceived:  String(qty),
+      QtyRemaining: String(qty),
+      Supplier:     supplier,
+      Notes:        notes,
+    });
+    _seedLots = await loadSheetData('SeedLots');
+    closeModal();
+    showToast('Inbound lot logged.', 'success');
+    renderInventoryView();
+  } catch (err) {
+    showToast('Error saving lot: ' + err.message, 'error');
+    console.error(err);
+    if (btn) { btn.disabled = false; btn.textContent = 'Log Lot'; }
+  }
+}
+
+/* ===========================================================
+   FIFO INVENTORY DECREMENT
+   Called from saveDelivery after writing delivery lines.
+   For each { varietyId, qty } entry, decrements QtyRemaining
+   across SeedLots in DateReceived order (oldest lot first).
+   =========================================================== */
+
+async function decrementLotsForDelivery(deliveryItems, cropYear) {
+  // Load fresh lots to avoid stale cache
+  const allLots = await loadSheetData('SeedLots');
+  _seedLots = allLots;
+
+  // Aggregate qty per varietyId (multiple lines may share a variety)
+  const toDecrement = {};
+  for (const { varietyId, qty } of deliveryItems) {
+    if (!qty || qty <= 0) continue;
+    toDecrement[varietyId] = (toDecrement[varietyId] || 0) + qty;
+  }
+  if (Object.keys(toDecrement).length === 0) return;
+
+  const batchData = [];
+
+  for (const [varietyId, totalQty] of Object.entries(toDecrement)) {
+    // FIFO: oldest DateReceived first
+    const lots = allLots
+      .filter(l => l.VarietyID === varietyId && l.CropYear === cropYear)
+      .slice()
+      .sort((a, b) => (a.DateReceived || '').localeCompare(b.DateReceived || ''));
+
+    const totalAvailable = lots.reduce((s, l) => s + (parseInt(l.QtyRemaining) || 0), 0);
+    if (totalAvailable < totalQty) {
+      showToast(
+        'Warning: delivered ' + totalQty + ' bags of ' + getVarietyLabel(varietyId) +
+        ' but only ' + totalAvailable + ' in inventory. Inventory floored at 0.',
+        'warning'
+      );
+    }
+
+    let remaining = totalQty;
+    for (const lot of lots) {
+      if (remaining <= 0) break;
+      const lotRemaining = parseInt(lot.QtyRemaining) || 0;
+      if (lotRemaining <= 0) continue;
+
+      const decrement       = Math.min(remaining, lotRemaining);
+      const newQtyRemaining = lotRemaining - decrement;
+      remaining -= decrement;
+
+      const updatedLot = { ...lot, QtyRemaining: String(newQtyRemaining) };
+      delete updatedLot._row;
+      const endCol = String.fromCharCode(64 + HEADERS.SeedLots.length);
+      batchData.push({
+        range:  `SeedLots!A${lot._row}:${endCol}${lot._row}`,
+        values: [HEADERS.SeedLots.map(h => String(updatedLot[h] !== undefined ? updatedLot[h] : ''))],
+      });
+    }
+  }
+
+  if (batchData.length > 0) {
+    await batchUpdateValues(batchData);
+    _seedLots = await loadSheetData('SeedLots');
+  }
+}
+
+/* ===========================================================
+   RETURN WORKFLOW
+   =========================================================== */
+
+function openReturnModal(orderId) {
+  const order = (_seedOrders || []).find(o => o.ID === orderId);
+  if (!order) return;
+
+  const deliveredLines = (_seedOrderLines || []).filter(
+    l => l.OrderID === orderId && (parseInt(l.QtyDelivered) || 0) > 0
+  );
+  if (deliveredLines.length === 0) {
+    showToast('No delivered bags to return on this order.', 'info');
+    return;
+  }
+
+  const lineRowsHtml = deliveredLines.map(l => {
+    const qtyDelivered = parseInt(l.QtyDelivered) || 0;
+    const vLabel = getVarietyLabel(l.VarietyFulfilled || l.VarietyOrdered);
+    const isSub  = l.VarietyFulfilled && l.VarietyFulfilled !== l.VarietyOrdered;
+    const subNote = isSub
+      ? `<div style="font-size:11px;color:#888;margin-top:2px">Fulfilled as: ${escapeHtml(vLabel)}</div>` : '';
+    const orderedLabel = getVarietyLabel(l.VarietyOrdered);
+    return `
+    <div class="deliv-line-row">
+      <div class="deliv-line-info">
+        <strong>${escapeHtml(orderedLabel)}</strong>${subNote}
+        <div class="deliv-line-meta">
+          <span>Ordered: ${parseInt(l.Qty) || 0}</span>
+          <span>Qty Delivered: ${qtyDelivered}</span>
+        </div>
+      </div>
+      <div class="deliv-line-fields">
+        <div class="form-group" style="flex:0 0 140px">
+          <label class="form-label">Qty Returning</label>
+          <input type="number" class="form-control"
+                 id="rqty-${escapeHtml(l.ID)}"
+                 min="0" max="${qtyDelivered}" value="0" step="1">
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  openModal(
+    'Record Return',
+    `<p style="font-size:13px;color:#666;margin-bottom:16px">
+       Enter the number of bags being returned for each line item. Leave at 0 to skip.
+     </p>
+     ${lineRowsHtml}`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-warning" id="save-return-btn"
+             onclick="saveReturn('${escapeHtml(orderId)}')">Record Return</button>`,
+    'modal-lg'
+  );
+}
+
+async function saveReturn(orderId) {
+  const order = (_seedOrders || []).find(o => o.ID === orderId);
+  if (!order) return;
+
+  const deliveredLines = (_seedOrderLines || []).filter(
+    l => l.OrderID === orderId && (parseInt(l.QtyDelivered) || 0) > 0
+  );
+
+  const returnData = deliveredLines.map(l => {
+    const returnQty = Math.max(0, parseInt(document.getElementById('rqty-' + l.ID)?.value || '0') || 0);
+    return { line: l, returnQty };
+  });
+
+  const anyReturn = returnData.some(d => d.returnQty > 0);
+  if (!anyReturn) {
+    showToast('Enter at least one bag quantity to return.', 'warning');
+    return;
+  }
+
+  // Validate — cannot return more than was delivered
+  for (const { line, returnQty } of returnData) {
+    const maxReturn = parseInt(line.QtyDelivered) || 0;
+    if (returnQty > maxReturn) {
+      showToast(
+        `Cannot return ${returnQty} bags — only ${maxReturn} were delivered for ` +
+        getVarietyLabel(line.VarietyOrdered) + '.',
+        'warning'
+      );
+      return;
+    }
+  }
+
+  const btn = document.getElementById('save-return-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
+
+  try {
+    // 1. Update line items: decrement QtyDelivered, recalculate DeliveryStatus
+    const lineHeaders = HEADERS.SeedOrderLines;
+    const batchData   = [];
+
+    for (const { line, returnQty } of returnData) {
+      if (returnQty <= 0) continue;
+      const oldDelivered    = parseInt(line.QtyDelivered) || 0;
+      const newDelivered    = Math.max(0, oldDelivered - returnQty);
+      const totalQty        = parseInt(line.Qty) || 0;
+      const newStatus       = newDelivered === 0 ? 'Pending'
+                            : newDelivered < totalQty ? 'Partial'
+                            : 'Delivered';
+
+      const updatedLine = {
+        ...line,
+        QtyDelivered:   String(newDelivered),
+        DeliveryStatus: newStatus,
+      };
+      delete updatedLine._row;
+      const endCol = String.fromCharCode(64 + lineHeaders.length);
+      batchData.push({
+        range:  `SeedOrderLines!A${line._row}:${endCol}${line._row}`,
+        values: [lineHeaders.map(h => String(updatedLine[h] !== undefined ? updatedLine[h] : ''))],
+      });
+    }
+
+    if (batchData.length > 0) {
+      await batchUpdateValues(batchData);
+    }
+
+    // 2. Reload lines and recalculate order status
+    _seedOrderLines = await loadSheetData('SeedOrderLines');
+    const allLines  = (_seedOrderLines || []).filter(l => l.OrderID === orderId);
+
+    if (allLines.length > 0 && order.Status !== 'Cancelled') {
+      const allDone = allLines.every(l => l.DeliveryStatus === 'Delivered');
+      const anyDone = allLines.some(l =>
+        l.DeliveryStatus === 'Delivered' || l.DeliveryStatus === 'Partial'
+      );
+      const newOrderStatus = allDone ? 'Delivered' : anyDone ? 'Partial' : 'Open';
+
+      if (newOrderStatus !== order.Status) {
+        const updatedOrder = { ...order, Status: newOrderStatus };
+        delete updatedOrder._row;
+        await updateSheetRow('SeedOrders', order._row, updatedOrder);
+        _seedOrders = await loadSheetData('SeedOrders');
+      }
+    }
+
+    // 3. Restore SeedLots (LIFO — add to newest lot first)
+    const returnItems = returnData
+      .filter(d => d.returnQty > 0)
+      .map(d => ({
+        varietyId: d.line.VarietyFulfilled || d.line.VarietyOrdered,
+        qty:       d.returnQty,
+      }));
+    if (returnItems.length > 0) {
+      await restoreLotsForReturn(returnItems, order.CropYear);
+    }
+
+    // 4. Decrement SeedCommissions
+    const supplierReturnMap = {};
+    for (const { line, returnQty } of returnData) {
+      if (returnQty <= 0) continue;
+      const fulfilledId  = line.VarietyFulfilled || line.VarietyOrdered;
+      const catalogEntry = (_seedCatalog || []).find(v => v.ID === fulfilledId);
+      if (!catalogEntry || !catalogEntry.Supplier) continue;
+      const supplier    = catalogEntry.Supplier;
+      const commPerBag  = parseInt(catalogEntry.CommissionPerBag) || 0;
+      if (!supplierReturnMap[supplier]) supplierReturnMap[supplier] = { bags: 0, commissionCents: 0 };
+      supplierReturnMap[supplier].bags           += returnQty;
+      supplierReturnMap[supplier].commissionCents += returnQty * commPerBag;
+    }
+    if (Object.keys(supplierReturnMap).length > 0) {
+      await decrementCommissionsForReturn(supplierReturnMap, order.CropYear);
+    }
+
+    closeModal();
+    showToast('Return recorded.', 'success');
+    renderOrderDetail(orderId);
+
+  } catch (err) {
+    showToast('Error recording return: ' + err.message, 'error');
+    console.error(err);
+    if (btn) { btn.disabled = false; btn.textContent = 'Record Return'; }
+  }
+}
+
+async function restoreLotsForReturn(returnItems, cropYear) {
+  const allLots = await loadSheetData('SeedLots');
+  _seedLots = allLots;
+
+  // Aggregate by variety
+  const toRestore = {};
+  for (const { varietyId, qty } of returnItems) {
+    if (!qty || qty <= 0) continue;
+    toRestore[varietyId] = (toRestore[varietyId] || 0) + qty;
+  }
+  if (Object.keys(toRestore).length === 0) return;
+
+  const batchData = [];
+
+  for (const [varietyId, returnQty] of Object.entries(toRestore)) {
+    // LIFO: newest DateReceived first (reverse of FIFO delivery)
+    const lots = allLots
+      .filter(l => l.VarietyID === varietyId && l.CropYear === cropYear)
+      .slice()
+      .sort((a, b) => (b.DateReceived || '').localeCompare(a.DateReceived || ''));
+
+    if (lots.length === 0) {
+      console.warn(`No lots found for variety ${varietyId} in ${cropYear} to restore.`);
+      continue;
+    }
+
+    // Add all returned bags to the most recently received lot
+    const lot            = lots[0];
+    const lotRemaining   = parseInt(lot.QtyRemaining) || 0;
+    const newQtyRemaining = lotRemaining + returnQty;
+
+    const updatedLot = { ...lot, QtyRemaining: String(newQtyRemaining) };
+    delete updatedLot._row;
+    const endCol = String.fromCharCode(64 + HEADERS.SeedLots.length);
+    batchData.push({
+      range:  `SeedLots!A${lot._row}:${endCol}${lot._row}`,
+      values: [HEADERS.SeedLots.map(h => String(updatedLot[h] !== undefined ? updatedLot[h] : ''))],
+    });
+  }
+
+  if (batchData.length > 0) {
+    await batchUpdateValues(batchData);
+    _seedLots = await loadSheetData('SeedLots');
+  }
+}
+
+async function decrementCommissionsForReturn(supplierReturnMap, cropYear) {
+  const commissions = await loadSheetData('SeedCommissions');
+  _seedCommissions  = commissions;
+
+  for (const [supplier, { bags, commissionCents }] of Object.entries(supplierReturnMap)) {
+    if (bags <= 0) continue;
+    const existing = commissions.find(c => c.CropYear === cropYear && c.Supplier === supplier);
+    if (!existing) continue;  // no record to decrement
+
+    const newBags     = Math.max(0, (parseInt(existing.BagsDelivered) || 0) - bags);
+    const newExpected = Math.max(0, (parseInt(existing.ExpectedTotal)  || 0) - commissionCents);
+    const newRate     = newBags > 0
+      ? Math.round(newExpected / newBags)
+      : (parseInt(existing.RatePerBag) || 0);
+    const amtRcvd     = parseInt(existing.AmountReceived) || 0;
+
+    const updated = {
+      ...existing,
+      BagsDelivered: String(newBags),
+      RatePerBag:    String(newRate),
+      ExpectedTotal: String(newExpected),
+      Variance:      String(newExpected - amtRcvd),
+    };
+    delete updated._row;
+    await updateSheetRow('SeedCommissions', existing._row, updated);
+  }
+}
+
+/* ===========================================================
+   NAVIGATION
+   =========================================================== */
+
+/* ===========================================================
+   COMMISSIONS SECTION
+   =========================================================== */
+
+async function loadCommissionsSection() {
+  updateCropYearLabels();
+  setLoading(true, 'Loading commissions\u2026');
+  try {
+    await ensureSheetsInitialized();
+    const [comms, catalog, orderLines, orders] = await Promise.all([
+      loadSheetData('SeedCommissions'),
+      loadSheetData('SeedCatalog'),
+      loadSheetData('SeedOrderLines'),
+      loadSheetData('SeedOrders'),
+    ]);
+    _seedCommissions = comms;
+    _seedCatalog     = catalog;
+    _seedOrderLines  = orderLines;
+    _seedOrders      = orders;
+    renderCommissionsTable();
+  } catch (err) {
+    const c = document.getElementById('commissions-content');
+    if (c) c.innerHTML = `<div class="empty-state"><p>Error: ${escapeHtml(err.message)}</p></div>`;
+    showToast('Error loading commissions: ' + err.message, 'error');
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function renderCommissionsTable() {
+  const container = document.getElementById('commissions-content');
+  if (!container) return;
+
+  const cy   = currentCropYear;
+  const rows = (_seedCommissions || []).filter(c => c.CropYear === cy);
+
+  if (rows.length === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">&#9998;</div>
+      <p>No commission data for ${escapeHtml(cy)}. Commissions are recorded automatically when deliveries are saved.</p>
+    </div>`;
+    return;
+  }
+
+  const sorted = [...rows].sort((a, b) => (a.Supplier || '').localeCompare(b.Supplier || ''));
+
+  let totExpected = 0, totReceived = 0;
+
+  const tableRows = sorted.map(c => {
+    const bags     = parseInt(c.BagsDelivered) || 0;
+    const rate     = parseInt(c.RatePerBag)    || 0;
+    const expected = parseInt(c.ExpectedTotal)  || 0;
+    const received = parseInt(c.AmountReceived) || 0;
+    const variance = expected - received;
+
+    totExpected += expected;
+    totReceived += received;
+
+    let varClass, varDisplay;
+    if (received >= expected) {
+      // Fully paid (green) — show overage as positive or $0.00
+      varClass   = 'var-green';
+      varDisplay = received > expected
+        ? '+' + formatCurrency(received - expected)
+        : formatCurrency(0);
+    } else if (received === 0) {
+      // Nothing received yet (amber)
+      varClass   = 'var-amber';
+      varDisplay = formatCurrency(variance);
+    } else {
+      // Partially paid — underpaid (red)
+      varClass   = 'var-red';
+      varDisplay = '\u2212' + formatCurrency(variance);
+    }
+
+    const safeId = escapeHtml(c.ID);
+
+    return `
+    <tr class="comm-supplier-row">
+      <td><strong>${escapeHtml(c.Supplier || '\u2014')}</strong></td>
+      <td style="text-align:right">${bags.toLocaleString()}</td>
+      <td style="text-align:right">${formatCurrency(rate)}</td>
+      <td style="text-align:right">${formatCurrency(expected)}</td>
+      <td style="text-align:right">${received ? formatCurrency(received) : '<span style="color:#bbb">\u2014</span>'}</td>
+      <td style="text-align:right">${c.DateReceived ? formatDate(c.DateReceived) : '<span style="color:#bbb">\u2014</span>'}</td>
+      <td style="text-align:right"><span class="${varClass}">${varDisplay}</span></td>
+      <td class="col-actions">
+        <div class="row-actions">
+          <button class="toggle-detail-btn"
+                  onclick="toggleCommissionDetail('${safeId}')">&#9660; Detail</button>
+          <button class="btn btn-primary btn-sm"
+                  onclick="openRecordCommissionPayment('${safeId}')">Record Payout</button>
+        </div>
+      </td>
+    </tr>
+    <tr id="comm-detail-${safeId}" class="comm-detail-row">
+      <td colspan="8" style="padding:0">
+        <div class="comm-detail-body" id="comm-detail-body-${safeId}">
+          <em style="color:#aaa;font-size:12px">Loading\u2026</em>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const totVariance = totExpected - totReceived;
+  const totVarClass = totReceived >= totExpected ? 'var-green'
+                    : totReceived === 0          ? 'var-amber'
+                    : 'var-red';
+  const totVarDisplay = totReceived >= totExpected
+    ? formatCurrency(Math.abs(totVariance))
+    : '\u2212' + formatCurrency(totVariance);
+
+  const footer = `
+    <tr class="comm-totals-row">
+      <td>Season Totals</td>
+      <td></td><td></td>
+      <td style="text-align:right">${formatCurrency(totExpected)}</td>
+      <td style="text-align:right">${formatCurrency(totReceived)}</td>
+      <td></td>
+      <td style="text-align:right"><span class="${totVarClass}">${totVarDisplay}</span></td>
+      <td></td>
+    </tr>`;
+
+  container.innerHTML = `
+    <table class="data-table">
+      <thead><tr>
+        <th>Supplier</th>
+        <th style="text-align:right">Bags Delivered</th>
+        <th style="text-align:right">Rate / Bag</th>
+        <th style="text-align:right">Expected Total</th>
+        <th style="text-align:right">Amount Received</th>
+        <th style="text-align:right">Date Received</th>
+        <th style="text-align:right">Variance</th>
+        <th class="col-actions">Actions</th>
+      </tr></thead>
+      <tbody>${tableRows}${footer}</tbody>
+    </table>`;
+}
+
+function toggleCommissionDetail(commId) {
+  const detailRow = document.getElementById('comm-detail-' + commId);
+  if (!detailRow) return;
+  const isOpen = detailRow.classList.toggle('open');
+  const btn = detailRow.previousElementSibling
+    ?.querySelector('.toggle-detail-btn');
+  if (btn) btn.innerHTML = (isOpen ? '&#9650;' : '&#9660;') + ' Detail';
+  if (isOpen) {
+    const comm = (_seedCommissions || []).find(c => c.ID === commId);
+    if (comm) renderCommissionDetail(commId, comm.Supplier, comm.CropYear);
+  }
+}
+
+function renderCommissionDetail(commId, supplier, cropYear) {
+  const bodyEl = document.getElementById('comm-detail-body-' + commId);
+  if (!bodyEl) return;
+
+  const cy = cropYear;
+
+  // Non-cancelled orders for this crop year
+  const cyOrders   = (_seedOrders || []).filter(o => o.CropYear === cy && o.Status !== 'Cancelled');
+  const cyOrderIds = new Set(cyOrders.map(o => o.ID));
+
+  // Delivered lines in scope
+  const deliveredLines = (_seedOrderLines || []).filter(l =>
+    cyOrderIds.has(l.OrderID) && (parseInt(l.QtyDelivered) || 0) > 0
+  );
+
+  // Catalog entries for this supplier + crop year
+  const catalog = (_seedCatalog || []).filter(v => v.CropYear === cy && v.Supplier === supplier);
+  const catIds  = new Set(catalog.map(v => v.ID));
+
+  // Accumulate bags per variety
+  const varMap = {};
+  for (const line of deliveredLines) {
+    const vid = line.VarietyFulfilled || line.VarietyOrdered;
+    if (!catIds.has(vid)) continue;
+    const cat = catalog.find(v => v.ID === vid);
+    if (!cat) continue;
+    if (!varMap[vid]) {
+      varMap[vid] = {
+        label: [cat.Crop, cat.Brand, cat.VarietyName].filter(Boolean).join(' \u2014 '),
+        bags:  0,
+        rate:  parseInt(cat.CommissionPerBag) || 0,
+      };
+    }
+    varMap[vid].bags += parseInt(line.QtyDelivered) || 0;
+  }
+
+  const entries = Object.values(varMap).sort((a, b) => a.label.localeCompare(b.label));
+
+  if (entries.length === 0) {
+    bodyEl.innerHTML = '<em style="color:#aaa;font-size:12px">No variety-level delivery data found for this supplier in ' + escapeHtml(cy) + '.</em>';
+    return;
+  }
+
+  const detailRows = entries.map(e => `
+    <tr>
+      <td style="padding:6px 10px">${escapeHtml(e.label)}</td>
+      <td style="padding:6px 10px;text-align:right">${e.bags.toLocaleString()}</td>
+      <td style="padding:6px 10px;text-align:right">${formatCurrency(e.rate)}</td>
+      <td style="padding:6px 10px;text-align:right;font-weight:600">${formatCurrency(e.bags * e.rate)}</td>
+    </tr>`).join('');
+
+  bodyEl.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead>
+        <tr style="background:#eef3eb">
+          <th style="padding:5px 10px;text-align:left;font-size:11px;color:#555;
+                     text-transform:uppercase;letter-spacing:0.5px;font-weight:700">Variety</th>
+          <th style="padding:5px 10px;text-align:right;font-size:11px;color:#555;
+                     text-transform:uppercase;letter-spacing:0.5px;font-weight:700">Bags Delivered</th>
+          <th style="padding:5px 10px;text-align:right;font-size:11px;color:#555;
+                     text-transform:uppercase;letter-spacing:0.5px;font-weight:700">Rate / Bag</th>
+          <th style="padding:5px 10px;text-align:right;font-size:11px;color:#555;
+                     text-transform:uppercase;letter-spacing:0.5px;font-weight:700">Commission</th>
+        </tr>
+      </thead>
+      <tbody>${detailRows}</tbody>
+    </table>`;
+}
+
+function openRecordCommissionPayment(commId) {
+  const comm = (_seedCommissions || []).find(c => c.ID === commId);
+  if (!comm) { showToast('Commission record not found.', 'error'); return; }
+
+  const today      = new Date().toISOString().slice(0, 10);
+  const existingAmt = (parseInt(comm.AmountReceived) || 0) / 100;
+
+  openModal(
+    'Record Commission Payout',
+    `<form id="comm-pay-form" onsubmit="return false">
+       <input type="hidden" id="cp-comm-id" value="${escapeHtml(commId)}">
+       <p style="margin-bottom:16px;font-size:13px;color:#555">
+         <strong>${escapeHtml(comm.Supplier)}</strong> &mdash;
+         Expected: <strong>${formatCurrency(parseInt(comm.ExpectedTotal) || 0)}</strong>
+       </p>
+       <div class="form-row">
+         <div class="form-group">
+           <label class="form-label">Amount Received ($) <span class="req">*</span></label>
+           <input type="number" id="cp-amount" class="form-control"
+                  min="0" step="0.01"
+                  value="${existingAmt > 0 ? existingAmt.toFixed(2) : ''}"
+                  placeholder="0.00">
+         </div>
+         <div class="form-group">
+           <label class="form-label">Date Received <span class="req">*</span></label>
+           <input type="date" id="cp-date" class="form-control"
+                  value="${comm.DateReceived || today}">
+         </div>
+       </div>
+       <div class="form-group">
+         <label class="form-label">Notes</label>
+         <textarea id="cp-notes" class="form-control"
+                   placeholder="Optional notes">${escapeHtml(comm.Notes || '')}</textarea>
+       </div>
+     </form>`,
+    `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+     <button class="btn btn-primary" onclick="saveCommissionPayment()">Save Payout</button>`
+  );
+  setTimeout(() => document.getElementById('cp-amount')?.focus(), 80);
+}
+
+async function saveCommissionPayment() {
+  const commId = document.getElementById('cp-comm-id').value;
+  const amtStr = document.getElementById('cp-amount').value.trim();
+  const date   = document.getElementById('cp-date').value;
+  const notes  = document.getElementById('cp-notes').value.trim();
+
+  const amtEl  = document.getElementById('cp-amount');
+  const dateEl = document.getElementById('cp-date');
+
+  if (!amtStr || isNaN(parseFloat(amtStr))) {
+    amtEl.classList.add('is-error');
+    showToast('Amount is required.', 'warning');
+    return;
+  }
+  if (!date) {
+    dateEl.classList.add('is-error');
+    showToast('Date is required.', 'warning');
+    return;
+  }
+  amtEl.classList.remove('is-error');
+  dateEl.classList.remove('is-error');
+
+  const amtCents = Math.round(parseFloat(amtStr) * 100);
+  const comm     = (_seedCommissions || []).find(c => c.ID === commId);
+  if (!comm) { showToast('Commission record not found.', 'error'); return; }
+
+  const expected = parseInt(comm.ExpectedTotal) || 0;
+  const variance = expected - amtCents;
+
+  const updated = {
+    ...comm,
+    AmountReceived: String(amtCents),
+    DateReceived:   date,
+    Variance:       String(variance),
+    Notes:          notes,
+  };
+  delete updated._row;
+
+  const btn = document.querySelector('#modal-footer .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
+
+  try {
+    await updateSheetRow('SeedCommissions', comm._row, updated);
+    // Update cache
+    const idx = (_seedCommissions || []).findIndex(c => c.ID === commId);
+    if (idx >= 0) _seedCommissions[idx] = { ...comm, ...updated, _row: comm._row };
+    closeModal();
+    showToast('Commission payout recorded.', 'success');
+    renderCommissionsTable();
+  } catch (err) {
+    showToast('Error saving payout: ' + err.message, 'error');
+    console.error(err);
+    if (btn) { btn.disabled = false; btn.textContent = 'Save Payout'; }
+  }
+}
+
+async function navTo(sectionId) {
+  document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+  const target = document.getElementById('section-' + sectionId);
+  if (target) target.classList.add('active');
+
+  document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+  const link = document.querySelector(`.nav-link[data-section="${sectionId}"]`);
+  if (link) link.classList.add('active');
+
+  if      (sectionId === 'dashboard')    await loadDashboardSection();
+  else if (sectionId === 'orders')       await loadOrdersSection();
+  else if (sectionId === 'settings')     await renderSettings();
+  else if (sectionId === 'seed-catalog') await loadSeedCatalogSection();
+  else if (sectionId === 'inventory')    await loadInventorySection();
+  else if (sectionId === 'commissions')  await loadCommissionsSection();
+}
+
+/* ===========================================================
+   UI STATE HELPERS
+   =========================================================== */
+
+function showAppShell() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-shell').style.display    = 'flex';
+  navTo('dashboard');
+}
+
+function showLoginScreen() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app-shell').style.display    = 'none';
+}
+
+function setLoading(show, message = 'Loading…') {
+  document.getElementById('loading-text').textContent = message;
+  if (show) {
+    // Delay 300 ms before showing to avoid flicker on fast calls
+    if (!_loadingTimer) {
+      _loadingTimer = setTimeout(() => {
+        _loadingTimer = null;
+        document.getElementById('loading-overlay').classList.add('show');
+      }, 300);
+    }
+  } else {
+    if (_loadingTimer) { clearTimeout(_loadingTimer); _loadingTimer = null; }
+    document.getElementById('loading-overlay').classList.remove('show');
+  }
+}
+
+function setConnStatus(status, label) {
+  const dot = document.getElementById('conn-dot');
+  const lbl = document.getElementById('conn-label');
+  if (dot) dot.className   = `conn-dot ${status}`;
+  if (lbl) lbl.textContent  = label;
+}
+
+function renderUserInfo() {
+  if (!currentUser) return;
+  const nameEl = document.getElementById('header-user-name');
+  if (nameEl) nameEl.textContent = currentUser.name;
+
+  const imgEl = document.getElementById('user-avatar-img');
+  const phEl  = document.getElementById('user-avatar-placeholder');
+
+  if (currentUser.photoUrl) {
+    if (imgEl) { imgEl.src = currentUser.photoUrl; imgEl.style.display = 'block'; }
+    if (phEl)  phEl.style.display = 'none';
+  } else {
+    if (imgEl) imgEl.style.display = 'none';
+    if (phEl)  { phEl.textContent = currentUser.initials; phEl.style.display = 'flex'; }
+  }
+}
+
+/* ===========================================================
+   TOAST NOTIFICATIONS
+   =========================================================== */
+
+const TOAST_ICONS = { success: '✓', error: '✕', warning: '⚠', info: 'i' };
+
+function showToast(message, type = 'info', duration = 4200) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<span class="toast-icon">${TOAST_ICONS[type] || 'i'}</span>
+                     <span class="toast-msg">${escapeHtml(message)}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('removing');
+    toast.addEventListener('animationend', () => toast.remove(), { once: true });
+  }, duration);
+}
+
+/* ===========================================================
+   UTILITY FUNCTIONS
+   =========================================================== */
+
+function generateId() {
+  return Date.now().toString(36).toUpperCase() +
+         Math.random().toString(36).substr(2, 5).toUpperCase();
+}
+
+function formatCurrency(cents) {
+  const n = (parseInt(cents) || 0) / 100;
+  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  try {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d)
+      .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch { return dateStr; }
+}
+
+function getInitials(name) {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return (parts[0]?.[0] || '?').toUpperCase();
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+</script>
+</body>
+</html>
