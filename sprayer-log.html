@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spray Application Log</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --green: #2D5016;
+    --green-mid: #4A7C2F;
+    --green-light: #7AAD52;
+    --gold: #C9A84C;
+    --cream: #F5F0E8;
+    --cream-dark: #EAE3D2;
+    --brown: #3D2B1F;
+    --gray: #8A8A7A;
+    --border: #C8BFA8;
+    --white: #FDFBF7;
+    --red: #B84040;
+    --blue: #2A5F8F;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--cream);
+    color: var(--brown);
+    min-height: 100vh;
+  }
+
+  /* ─── HEADER ─── */
+  header {
+    background: var(--green);
+    position: relative;
+    overflow: hidden;
+  }
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--gold), var(--green-light), var(--gold));
+  }
+  .header-inner {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 22px 24px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .header-icon {
+    width: 44px; height: 44px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .header-text h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.02em;
+  }
+  .header-text p {
+    font-size: 12px;
+    color: rgba(255,255,255,0.55);
+    margin-top: 2px;
+    font-weight: 300;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  /* ─── MAIN ─── */
+  main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 24px 60px;
+  }
+
+  /* ─── SETUP NOTICE ─── */
+  .setup-notice {
+    background: #FFF8E7;
+    border: 1px solid var(--gold);
+    border-left: 4px solid var(--gold);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #5C4A1E;
+  }
+  .setup-notice strong { font-weight: 600; }
+  #setup-url-input {
+    width: 100%;
+    margin-top: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    background: white;
+    color: var(--brown);
+  }
+  #setup-url-input:focus { outline: 2px solid var(--gold); border-color: transparent; }
+
+  /* ─── CARD ─── */
+  .card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+  .card-header {
+    background: var(--cream-dark);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-header span { font-size: 14px; }
+  .card-header h2 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--green);
+    flex: 1;
+  }
+  .card-header .row-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--gray);
+  }
+  .card-body { padding: 16px 18px; }
+
+  /* ─── FORM GRID ─── */
+  .field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .field-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+  .field-full { grid-column: 1 / -1; }
+
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gray);
+  }
+  input, select, textarea {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    padding: 8px 11px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--white);
+    color: var(--brown);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--green-mid);
+    box-shadow: 0 0 0 3px rgba(74,124,47,0.12);
+  }
+  select { cursor: pointer; }
+  textarea { resize: vertical; min-height: 68px; }
+
+  /* ─── FARM ROWS ─── */
+  .farm-rows-header {
+    display: grid;
+    grid-template-columns: 1fr 120px 36px;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 10px;
+  }
+  .farm-rows-header label { font-size: 11px; }
+
+  .farm-row {
+    display: grid;
+    grid-template-columns: 1fr 120px 36px;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: start;
+    animation: slideIn 0.18s ease;
+  }
+
+  /* ownership badge shown below farm select */
+  .farm-owners-preview {
+    grid-column: 1 / 2;
+    margin-top: -4px;
+    margin-bottom: 2px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .owner-badge {
+    font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace;
+    background: var(--cream-dark);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 7px;
+    color: var(--green);
+    white-space: nowrap;
+  }
+
+  /* ─── PRODUCTS TABLE ─── */
+  .products-header {
+    display: grid;
+    grid-template-columns: 1fr 130px 36px;
+    gap: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 10px;
+  }
+  .product-row {
+    display: grid;
+    grid-template-columns: 1fr 130px 36px;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+    animation: slideIn 0.18s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ─── PREVIEW TABLE ─── */
+  .preview-wrap {
+    overflow-x: auto;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+  .preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .preview-table th {
+    background: var(--green);
+    color: white;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 7px 10px;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .preview-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    color: var(--brown);
+  }
+  .preview-table tr:last-child td { border-bottom: none; }
+  .preview-table tr:nth-child(even) td { background: var(--cream); }
+  .preview-table .num { text-align: right; font-family: 'IBM Plex Mono', monospace; }
+  .preview-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--gray);
+    font-size: 13px;
+    font-style: italic;
+  }
+
+  /* ─── BUTTONS ─── */
+  .btn-remove {
+    width: 36px; height: 36px;
+    border: 1px solid #E0C0C0;
+    border-radius: 6px;
+    background: #FFF5F5;
+    color: var(--red);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .btn-remove:hover { background: #FFE8E8; }
+
+  .btn-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 7px 13px;
+    border: 1px dashed var(--green-mid);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--green-mid);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .btn-add:hover { background: rgba(74,124,47,0.06); color: var(--green); }
+
+  .submit-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 6px;
+  }
+  .btn-submit {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 11px 32px;
+    background: var(--green);
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    letter-spacing: 0.02em;
+  }
+  .btn-submit:hover { background: var(--green-mid); }
+  .btn-submit:active { transform: scale(0.98); }
+  .btn-submit:disabled { background: var(--gray); cursor: not-allowed; transform: none; }
+
+  /* ─── STATUS ─── */
+  .status {
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    display: none;
+    align-items: center;
+    gap: 8px;
+  }
+  .status.success { display: flex; background: #EDF7E6; border: 1px solid #9EC97A; color: #2D5016; }
+  .status.error   { display: flex; background: #FFF0F0; border: 1px solid #E0A0A0; color: var(--red); }
+  .status.loading { display: flex; background: var(--cream-dark); border: 1px solid var(--border); color: var(--gray); }
+
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  footer {
+    text-align: center;
+    font-size: 11px;
+    color: var(--gray);
+    margin-top: 32px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  @media (max-width: 580px) {
+    .field-grid, .field-grid.three { grid-template-columns: 1fr; }
+    .field-full { grid-column: 1; }
+    .farm-rows-header, .farm-row { grid-template-columns: 1fr 90px 36px; }
+    .products-header, .product-row { grid-template-columns: 1fr 90px 36px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="header-icon">🌱</div>
+    <div class="header-text">
+      <h1>Spray Application Log</h1>
+      <p>Field Operations · Greenwing Ag</p>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- SETUP -->
+  <div class="setup-notice" id="setup-notice">
+    <strong>⚙️ One-time setup:</strong> Paste your Google Apps Script Web App URL below.
+    <input type="text" id="setup-url-input" placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec" oninput="saveScriptUrl(this.value)" />
+  </div>
+
+  <!-- APPLICATION INFO -->
+  <div class="card">
+    <div class="card-header"><span>📋</span><h2>Application Info</h2></div>
+    <div class="card-body">
+      <div class="field-grid three">
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="date" />
+        </div>
+        <div class="field">
+          <label>Time</label>
+          <input type="time" id="time" />
+        </div>
+        <div class="field">
+          <label>Operator</label>
+          <select id="operator"><option value="">— Select —</option></select>
+        </div>
+        <div class="field">
+          <label>Crop</label>
+          <select id="crop"><option value="">— Select —</option></select>
+        </div>
+        <div class="field">
+          <label>Gallons per Acre (GPA)</label>
+          <input type="number" id="gpa" min="0" step="0.1" placeholder="e.g. 15" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FARMS -->
+  <div class="card">
+    <div class="card-header">
+      <span>🗺️</span>
+      <h2>Farms Covered</h2>
+      <span class="row-count" id="farm-acre-total"></span>
+    </div>
+    <div class="card-body">
+      <div class="farm-rows-header">
+        <label>Farm</label>
+        <label>Actual Acres</label>
+        <label></label>
+      </div>
+      <div id="farm-rows-list"></div>
+      <button class="btn-add" onclick="addFarmRow()">+ Add Farm</button>
+    </div>
+  </div>
+
+  <!-- PRODUCTS -->
+  <div class="card">
+    <div class="card-header"><span>🧪</span><h2>Products Applied</h2></div>
+    <div class="card-body">
+      <div class="products-header">
+        <label>Product</label>
+        <label>Rate (oz or lbs / ac)</label>
+        <label></label>
+      </div>
+      <div id="products-list"></div>
+      <button class="btn-add" onclick="addProductRow()">+ Add Product</button>
+    </div>
+  </div>
+
+  <!-- BILLING PREVIEW -->
+  <div class="card">
+    <div class="card-header"><span>💰</span><h2>Billing Preview</h2></div>
+    <div class="card-body" style="padding:0">
+      <div class="preview-wrap">
+        <div class="preview-empty" id="preview-empty">Fill in farms and products above to see billing rows.</div>
+        <table class="preview-table" id="preview-table" style="display:none">
+          <thead>
+            <tr>
+              <th>Farm</th>
+              <th>Owner</th>
+              <th>Own%</th>
+              <th>Farm Ac</th>
+              <th>Owner Ac</th>
+              <th>Product</th>
+              <th>Rate</th>
+              <th>Total Used</th>
+            </tr>
+          </thead>
+          <tbody id="preview-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTES -->
+  <div class="card">
+    <div class="card-header"><span>📝</span><h2>Notes</h2></div>
+    <div class="card-body">
+      <div class="field">
+        <label>Additional Notes (optional)</label>
+        <textarea id="notes" placeholder="Weather conditions, equipment issues, field observations…"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUBMIT -->
+  <div class="submit-row">
+    <div class="status" id="status">
+      <span class="spinner" id="spinner" style="display:none"></span>
+      <span id="status-text"></span>
+    </div>
+    <button class="btn-submit" id="submit-btn" onclick="submitForm()">Submit Application Log</button>
+  </div>
+
+  <footer>greenwing ag · spray log v2.0</footer>
+</main>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+
+const STORAGE_KEY = 'greenwing_spray_script_url';
+
+// farmOwnership: { "Farm Name": [{owner, pct}, ...] }
+let farmOwnership = {};
+
+let LISTS = {
+  crops:     [],
+  products:  [],
+  operators: [],
+  farms:     []   // just the farm names for the dropdown
+};
+
+let farmRowCount    = 0;
+let productRowCount = 0;
+
+// ═══════════════════════════════════════════════════════
+//  SCRIPT URL
+// ═══════════════════════════════════════════════════════
+
+function getScriptUrl() { return localStorage.getItem(STORAGE_KEY) || ''; }
+
+function saveScriptUrl(url) {
+  localStorage.setItem(STORAGE_KEY, url.trim());
+  clearTimeout(window._urlDebounce);
+  window._urlDebounce = setTimeout(() => fetchLists(), 900);
+}
+
+// ═══════════════════════════════════════════════════════
+//  FETCH LISTS FROM SHEET
+// ═══════════════════════════════════════════════════════
+
+async function fetchLists() {
+  const url = getScriptUrl();
+  if (!url) return;
+
+  setDropdownsLoading(true);
+  try {
+    const resp = await fetch(`${url}?action=getLists`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+
+    if (data.crops)     LISTS.crops     = data.crops;
+    if (data.operators) LISTS.operators = data.operators;
+    if (data.products)  LISTS.products  = data.products;
+    if (data.farms)     LISTS.farms     = data.farms;
+
+    // farmOwnership comes back as { farmName: [{owner, pct}] }
+    if (data.farmOwnership) farmOwnership = data.farmOwnership;
+
+    repopulateStaticDropdowns();
+    repopulateFarmSelects();
+    repopulateProductSelects();
+  } catch (err) {
+    console.warn('List fetch failed:', err);
+  } finally {
+    setDropdownsLoading(false);
+  }
+}
+
+function setDropdownsLoading(on) {
+  ['crop','operator'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.disabled = on;
+    if (on) sel.innerHTML = '<option>Loading…</option>';
+  });
+}
+
+function repopulateStaticDropdowns() {
+  refillSelect('crop',     LISTS.crops,     '— Select Crop —');
+  refillSelect('operator', LISTS.operators, '— Select Operator —');
+}
+
+function refillSelect(id, items, placeholder) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  sel.disabled = false;
+  sel.innerHTML = `<option value="">${placeholder || '— Select —'}</option>` +
+    items.map(i => `<option value="${i}">${i}</option>`).join('');
+}
+
+function repopulateFarmSelects() {
+  document.querySelectorAll('.farm-select').forEach(sel => {
+    const current = sel.value;
+    sel.innerHTML = `<option value="">— Select Farm —</option>` +
+      LISTS.farms.map(f => `<option value="${f}">${f}</option>`).join('');
+    if (current) { sel.value = current; updateOwnerBadges(sel); }
+  });
+}
+
+function repopulateProductSelects() {
+  document.querySelectorAll('.product-select').forEach(sel => {
+    const current = sel.value;
+    sel.innerHTML = `<option value="">— Select Product —</option>` +
+      LISTS.products.map(p => `<option value="${p}">${p}</option>`).join('');
+    if (current) sel.value = current;
+  });
+  updatePreview();
+}
+
+// ═══════════════════════════════════════════════════════
+//  FARM ROWS
+// ═══════════════════════════════════════════════════════
+
+function addFarmRow() {
+  farmRowCount++;
+  const id = `farm-row-${farmRowCount}`;
+  const container = document.getElementById('farm-rows-list');
+
+  const wrapper = document.createElement('div');
+  wrapper.id = id;
+
+  wrapper.innerHTML = `
+    <div class="farm-row">
+      <select class="farm-select" onchange="onFarmChange(this)">
+        <option value="">— Select Farm —</option>
+        ${LISTS.farms.map(f => `<option value="${f}">${f}</option>`).join('')}
+      </select>
+      <input type="number" class="farm-acres" min="0" step="0.1" placeholder="Acres"
+             oninput="updatePreview(); updateAcreTotal();" />
+      <button class="btn-remove" onclick="removeFarmRow('${id}')" title="Remove">✕</button>
+    </div>
+    <div class="farm-owners-preview" id="badges-${id}"></div>
+  `;
+  container.appendChild(wrapper);
+}
+
+function removeFarmRow(id) {
+  const rows = document.querySelectorAll('.farm-row');
+  if (rows.length <= 1) return;
+  document.getElementById(id)?.remove();
+  updatePreview();
+  updateAcreTotal();
+}
+
+function onFarmChange(sel) {
+  updateOwnerBadges(sel);
+  updatePreview();
+}
+
+function updateOwnerBadges(sel) {
+  // sel lives inside a wrapper div; find sibling badges container
+  const wrapper = sel.closest('[id^="farm-row-"]');
+  if (!wrapper) return;
+  const badgeContainer = document.getElementById(`badges-${wrapper.id}`);
+  if (!badgeContainer) return;
+
+  const farm = sel.value;
+  const owners = farm && farmOwnership[farm] ? farmOwnership[farm] : [];
+  badgeContainer.innerHTML = owners.length
+    ? owners.map(o => `<span class="owner-badge">${o.owner} ${o.pct}%</span>`).join('')
+    : (farm ? '<span class="owner-badge" style="color:var(--red);border-color:#E0A0A0">No owners set in Farms tab</span>' : '');
+}
+
+function updateAcreTotal() {
+  let total = 0;
+  document.querySelectorAll('.farm-acres').forEach(inp => {
+    total += parseFloat(inp.value) || 0;
+  });
+  const el = document.getElementById('farm-acre-total');
+  el.textContent = total > 0 ? `${total.toFixed(1)} total acres` : '';
+}
+
+// ═══════════════════════════════════════════════════════
+//  PRODUCT ROWS
+// ═══════════════════════════════════════════════════════
+
+function addProductRow() {
+  productRowCount++;
+  const id = `product-row-${productRowCount}`;
+  const list = document.getElementById('products-list');
+  const row = document.createElement('div');
+  row.className = 'product-row';
+  row.id = id;
+  row.innerHTML = `
+    <select class="product-select" onchange="updatePreview()">
+      <option value="">— Select Product —</option>
+      ${LISTS.products.map(p => `<option value="${p}">${p}</option>`).join('')}
+    </select>
+    <input type="number" class="product-rate" min="0" step="0.01" placeholder="Rate"
+           oninput="updatePreview()" />
+    <button class="btn-remove" onclick="removeProductRow('${id}')" title="Remove">✕</button>
+  `;
+  list.appendChild(row);
+}
+
+function removeProductRow(id) {
+  const rows = document.querySelectorAll('.product-row');
+  if (rows.length <= 1) return;
+  document.getElementById(id)?.remove();
+  updatePreview();
+}
+
+// ═══════════════════════════════════════════════════════
+//  BILLING PREVIEW
+// ═══════════════════════════════════════════════════════
+
+function buildRows() {
+  // Collect farms
+  const farms = [];
+  document.querySelectorAll('[id^="farm-row-"]').forEach(wrapper => {
+    const sel   = wrapper.querySelector('.farm-select');
+    const acres = parseFloat(wrapper.querySelector('.farm-acres')?.value) || 0;
+    if (sel && sel.value && acres > 0) {
+      farms.push({ farm: sel.value, acres });
+    }
+  });
+
+  // Collect products
+  const products = [];
+  document.querySelectorAll('.product-row').forEach(row => {
+    const sel  = row.querySelector('.product-select');
+    const rate = parseFloat(row.querySelector('.product-rate')?.value) || 0;
+    if (sel && sel.value) {
+      products.push({ product: sel.value, rate });
+    }
+  });
+
+  if (!farms.length || !products.length) return [];
+
+  const rows = [];
+  farms.forEach(({ farm, acres }) => {
+    const owners = farmOwnership[farm] || [{ owner: '(unassigned)', pct: 100 }];
+    products.forEach(({ product, rate }) => {
+      owners.forEach(({ owner, pct }) => {
+        const ownerAcres = acres * (pct / 100);
+        const totalUsed  = rate > 0 ? (ownerAcres * rate).toFixed(2) : '';
+        rows.push({ farm, owner, pct, farmAcres: acres, ownerAcres: ownerAcres.toFixed(2), product, rate, totalUsed });
+      });
+    });
+  });
+  return rows;
+}
+
+function updatePreview() {
+  const rows = buildRows();
+  const empty = document.getElementById('preview-empty');
+  const table = document.getElementById('preview-table');
+  const tbody = document.getElementById('preview-tbody');
+
+  if (!rows.length) {
+    empty.style.display = '';
+    table.style.display = 'none';
+    return;
+  }
+
+  empty.style.display = 'none';
+  table.style.display = '';
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.farm}</td>
+      <td>${r.owner}</td>
+      <td class="num">${r.pct}%</td>
+      <td class="num">${r.farmAcres}</td>
+      <td class="num">${r.ownerAcres}</td>
+      <td>${r.product}</td>
+      <td class="num">${r.rate || '—'}</td>
+      <td class="num">${r.totalUsed || '—'}</td>
+    </tr>
+  `).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  VALIDATION
+// ═══════════════════════════════════════════════════════
+
+function validate() {
+  if (!document.getElementById('date').value)
+    return err('Please enter a Date.');
+  if (!document.getElementById('time').value)
+    return err('Please enter a Time.');
+  if (!document.getElementById('crop').value)
+    return err('Please select a Crop.');
+  if (!document.getElementById('operator').value)
+    return err('Please select an Operator.');
+  if (!document.getElementById('gpa').value)
+    return err('Please enter Gallons per Acre.');
+
+  const farmSelects = document.querySelectorAll('.farm-select');
+  let hasFarm = false;
+  farmSelects.forEach(s => { if (s.value) hasFarm = true; });
+  if (!hasFarm) return err('Please select at least one Farm.');
+
+  let farmAcresOk = true;
+  document.querySelectorAll('[id^="farm-row-"]').forEach(wrapper => {
+    const sel   = wrapper.querySelector('.farm-select');
+    const acres = wrapper.querySelector('.farm-acres');
+    if (sel && sel.value && (!acres || !acres.value || parseFloat(acres.value) <= 0)) {
+      farmAcresOk = false;
+    }
+  });
+  if (!farmAcresOk) return err('Please enter Acres for each selected Farm.');
+
+  const productSelects = document.querySelectorAll('.product-select');
+  let hasProduct = false;
+  productSelects.forEach(s => { if (s.value) hasProduct = true; });
+  if (!hasProduct) return err('Please add at least one Product.');
+
+  return true;
+}
+
+function err(msg) { showStatus('error', msg); return false; }
+
+// ═══════════════════════════════════════════════════════
+//  SUBMIT
+// ═══════════════════════════════════════════════════════
+
+async function submitForm() {
+  if (!validate()) return;
+
+  const scriptUrl = getScriptUrl();
+  if (!scriptUrl) {
+    showStatus('error', 'No script URL configured. Paste your Apps Script URL in the setup box.');
+    return;
+  }
+
+  const date     = document.getElementById('date').value;
+  const time     = document.getElementById('time').value;
+  const crop     = document.getElementById('crop').value;
+  const operator = document.getElementById('operator').value;
+  const gpa      = parseFloat(document.getElementById('gpa').value);
+  const notes    = document.getElementById('notes').value.trim();
+  const submittedAt = new Date().toISOString();
+
+  const rows = buildRows().map(r => ({
+    submittedAt, date, time, crop, operator, gpa, notes,
+    farm:       r.farm,
+    owner:      r.owner,
+    ownerPct:   r.pct,
+    farmAcres:  r.farmAcres,
+    ownerAcres: r.ownerAcres,
+    product:    r.product,
+    rate:       r.rate,
+    totalUsed:  r.totalUsed
+  }));
+
+  showStatus('loading', `Saving ${rows.length} rows to Google Sheets…`);
+  document.getElementById('submit-btn').disabled = true;
+
+  try {
+    await fetch(scriptUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows })
+    });
+    showStatus('success', `✓ ${rows.length} rows saved to Google Sheets.`);
+    resetForm();
+  } catch (err) {
+    showStatus('error', 'Network error — check your connection and try again.');
+    console.error(err);
+  } finally {
+    document.getElementById('submit-btn').disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════
+
+function showStatus(type, text) {
+  const el = document.getElementById('status');
+  el.className = `status ${type}`;
+  document.getElementById('status-text').textContent = text;
+  document.getElementById('spinner').style.display = type === 'loading' ? 'block' : 'none';
+  el.style.display = 'flex';
+}
+
+function toDateString(d) { return d.toISOString().split('T')[0]; }
+function toTimeString(d) { return d.toTimeString().slice(0, 5); }
+
+function resetForm() {
+  document.getElementById('crop').value     = '';
+  document.getElementById('operator').value = '';
+  document.getElementById('gpa').value      = '';
+  document.getElementById('notes').value    = '';
+  const now = new Date();
+  document.getElementById('date').value = toDateString(now);
+  document.getElementById('time').value = toTimeString(now);
+
+  document.getElementById('farm-rows-list').innerHTML = '';
+  farmRowCount = 0;
+  addFarmRow();
+
+  document.getElementById('products-list').innerHTML = '';
+  productRowCount = 0;
+  addProductRow();
+
+  updatePreview();
+  updateAcreTotal();
+}
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+
+async function init() {
+  const saved = getScriptUrl();
+  if (saved) document.getElementById('setup-url-input').value = saved;
+
+  const now = new Date();
+  document.getElementById('date').value = toDateString(now);
+  document.getElementById('time').value = toTimeString(now);
+
+  addFarmRow();
+  addProductRow();
+
+  if (saved) await fetchLists();
+}
+
+init();
+</script>
+</body>
+</html>
