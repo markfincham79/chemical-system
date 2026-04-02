@@ -390,12 +390,6 @@
 
 <main>
 
-  <!-- SETUP -->
-  <div class="setup-notice" id="setup-notice">
-    <strong>⚙️ One-time setup:</strong> Paste your Google Apps Script Web App URL below.
-    <input type="text" id="setup-url-input" placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec" oninput="saveScriptUrl(this.value)" />
-  </div>
-
   <!-- APPLICATION INFO -->
   <div class="card">
     <div class="card-header"><span>📋</span><h2>Application Info</h2></div>
@@ -529,7 +523,7 @@ let productRowCount = 0;
 //  SCRIPT URL
 // ═══════════════════════════════════════════════════════
 
-function getScriptUrl() { return localStorage.getItem(STORAGE_KEY) || ''; }
+function getScriptUrl() { return localStorage.getItem(STORAGE_KEY) || 'https://script.google.com/macros/s/AKfycbxiGqAdNGV_cp7Wi8Cg1jOqtSxzYr8I9gyDTFlkVjDUqkWZ26jvwe0ptuNNBPNjeBbd/exec'; }
 
 function saveScriptUrl(url) {
   localStorage.setItem(STORAGE_KEY, url.trim());
