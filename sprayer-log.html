@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Spray Application Log</title>
+<title>ProfitTrace · Field Operations Log</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
 
@@ -361,13 +361,50 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* ─── LOG TYPE TOGGLE ─── */
+  .log-type-toggle {
+    display: flex;
+    gap: 0;
+    background: var(--cream-dark);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: 16px;
+    width: fit-content;
+  }
+  .log-type-btn {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 9px 28px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--gray);
+    transition: all 0.18s;
+    letter-spacing: 0.01em;
+  }
+  .log-type-btn.active {
+    background: var(--green);
+    color: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  }
+  .log-type-btn:not(.active):hover { color: var(--brown); }
+
   footer {
     text-align: center;
     font-size: 11px;
     color: var(--gray);
     margin-top: 32px;
     font-family: 'IBM Plex Mono', monospace;
+    line-height: 2;
   }
+  footer a {
+    color: var(--green-mid);
+    text-decoration: none;
+  }
+  footer a:hover { text-decoration: underline; }
 
   @media (max-width: 580px) {
     .field-grid, .field-grid.three { grid-template-columns: 1fr; }
@@ -391,6 +428,12 @@
 
 <main>
 
+  <!-- LOG TYPE TOGGLE -->
+  <div class="log-type-toggle">
+    <button class="log-type-btn active" id="btn-spray"   onclick="setLogType('spray')">🧪 Spray Application</button>
+    <button class="log-type-btn"        id="btn-planting" onclick="setLogType('planting')">🌽 Planting</button>
+  </div>
+
   <!-- APPLICATION INFO -->
   <div class="card">
     <div class="card-header"><span>📋</span><h2>Application Info</h2></div>
@@ -412,9 +455,13 @@
           <label>Crop</label>
           <select id="crop"><option value="">— Select —</option></select>
         </div>
-        <div class="field">
-          <label>Gallons per Acre (GPA)</label>
+        <div class="field" id="gpa-field">
+          <label id="gpa-label">Gallons per Acre (GPA)</label>
           <input type="number" id="gpa" min="0" step="0.1" placeholder="e.g. 15" />
+        </div>
+        <div class="field">
+          <label>Application Type <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+          <select id="apptype"><option value="">— Select Type —</option></select>
         </div>
       </div>
     </div>
@@ -440,15 +487,15 @@
 
   <!-- PRODUCTS -->
   <div class="card">
-    <div class="card-header"><span>🧪</span><h2>Products Applied</h2></div>
+    <div class="card-header"><span id="products-icon">🧪</span><h2 id="products-title">Products Applied</h2></div>
     <div class="card-body">
       <div class="products-header">
-        <label>Product</label>
-        <label>Rate (oz or lbs / ac)</label>
+        <label id="product-col-label">Product</label>
+        <label id="rate-col-label">Rate (oz or lbs / ac)</label>
         <label></label>
       </div>
       <div id="products-list"></div>
-      <button class="btn-add" onclick="addProductRow()">+ Add Product</button>
+      <button class="btn-add" id="add-product-btn" onclick="addProductRow()">+ Add Product</button>
     </div>
   </div>
 
@@ -497,7 +544,10 @@
     <button class="btn-submit" id="submit-btn" onclick="submitForm()">Submit Application Log</button>
   </div>
 
-  <footer>greenwing ag · spray log v2.0</footer>
+  <footer>
+    greenwing ag · profittrace spray log v3.0<br>
+    <a href="https://docs.google.com/spreadsheets/d/13ZChMtSBpp-NCKZdrh2H1eQWRCaySnovqW8WCiWduiE/edit" target="_blank">📊 View Logged Data in Google Sheets</a>
+  </footer>
 </main>
 
 <script>
@@ -507,14 +557,18 @@
 
 const STORAGE_KEY = 'greenwing_spray_script_url';
 
+let logType = 'spray'; // 'spray' or 'planting'
+
 // farmOwnership: { "Farm Name": [{owner, pct}, ...] }
 let farmOwnership = {};
 
 let LISTS = {
-  crops:     [],
-  products:  [],
-  operators: [],
-  farms:     []   // just the farm names for the dropdown
+  crops:        [],
+  products:     [],
+  seeds:        [],
+  operators:    [],
+  farms:        [],
+  appTypes:     []
 };
 
 let farmRowCount    = 0;
@@ -546,13 +600,13 @@ async function fetchLists() {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
 
-    if (data.crops)     LISTS.crops     = data.crops;
-    if (data.operators) LISTS.operators = data.operators;
-    if (data.products)  LISTS.products  = data.products;
-    if (data.farms)     LISTS.farms     = data.farms;
-
-    // farmOwnership comes back as { farmName: [{owner, pct}] }
-    if (data.farmOwnership) farmOwnership = data.farmOwnership;
+    if (data.crops)        LISTS.crops     = data.crops;
+    if (data.operators)    LISTS.operators = data.operators;
+    if (data.products)     LISTS.products  = data.products;
+    if (data.seeds)        LISTS.seeds     = data.seeds;
+    if (data.appTypes)     LISTS.appTypes  = data.appTypes;
+    if (data.farms)        LISTS.farms     = data.farms;
+    if (data.farmOwnership) farmOwnership  = data.farmOwnership;
 
     repopulateStaticDropdowns();
     repopulateFarmSelects();
@@ -565,7 +619,7 @@ async function fetchLists() {
 }
 
 function setDropdownsLoading(on) {
-  ['crop','operator'].forEach(id => {
+  ['crop','operator','apptype'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
     sel.disabled = on;
@@ -576,6 +630,7 @@ function setDropdownsLoading(on) {
 function repopulateStaticDropdowns() {
   refillSelect('crop',     LISTS.crops,     '— Select Crop —');
   refillSelect('operator', LISTS.operators, '— Select Operator —');
+  refillSelect('apptype',  LISTS.appTypes,  '— Select Type —');
 }
 
 function refillSelect(id, items, placeholder) {
@@ -596,13 +651,52 @@ function repopulateFarmSelects() {
 }
 
 function repopulateProductSelects() {
+  const items = logType === 'planting' ? LISTS.seeds : LISTS.products;
+  const placeholder = logType === 'planting' ? '— Select Seed —' : '— Select Product —';
   document.querySelectorAll('.product-select').forEach(sel => {
     const current = sel.value;
-    sel.innerHTML = `<option value="">— Select Product —</option>` +
-      LISTS.products.map(p => `<option value="${p}">${p}</option>`).join('');
+    sel.innerHTML = `<option value="">${placeholder}</option>` +
+      items.map(p => `<option value="${p}">${p}</option>`).join('');
     if (current) sel.value = current;
   });
   updatePreview();
+}
+
+// ═══════════════════════════════════════════════════════
+//  LOG TYPE TOGGLE
+// ═══════════════════════════════════════════════════════
+
+function setLogType(type) {
+  logType = type;
+
+  // Toggle buttons
+  document.getElementById('btn-spray').classList.toggle('active',    type === 'spray');
+  document.getElementById('btn-planting').classList.toggle('active', type === 'planting');
+
+  // Update products card labels
+  if (type === 'planting') {
+    document.getElementById('products-icon').textContent   = '🌽';
+    document.getElementById('products-title').textContent  = 'Seeds / Traits';
+    document.getElementById('product-col-label').textContent = 'Seed';
+    document.getElementById('rate-col-label').textContent  = 'Seeding Rate (seeds/ac)';
+    document.getElementById('add-product-btn').textContent = '+ Add Seed';
+    document.getElementById('gpa-label').textContent       = 'Population (seeds/ac)';
+    document.getElementById('gpa-field').style.display     = 'none';
+  } else {
+    document.getElementById('products-icon').textContent   = '🧪';
+    document.getElementById('products-title').textContent  = 'Products Applied';
+    document.getElementById('product-col-label').textContent = 'Product';
+    document.getElementById('rate-col-label').textContent  = 'Rate (oz or lbs / ac)';
+    document.getElementById('add-product-btn').textContent = '+ Add Product';
+    document.getElementById('gpa-label').textContent       = 'Gallons per Acre (GPA)';
+    document.getElementById('gpa-field').style.display     = '';
+  }
+
+  // Rebuild product rows with correct list
+  document.getElementById('products-list').innerHTML = '';
+  productRowCount = 0;
+  addProductRow();
+  repopulateProductSelects();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -679,10 +773,12 @@ function addProductRow() {
   const row = document.createElement('div');
   row.className = 'product-row';
   row.id = id;
+  const productItems = logType === 'planting' ? LISTS.seeds : LISTS.products;
+  const productPlaceholder = logType === 'planting' ? '— Select Seed —' : '— Select Product —';
   row.innerHTML = `
     <select class="product-select" onchange="updatePreview()">
-      <option value="">— Select Product —</option>
-      ${LISTS.products.map(p => `<option value="${p}">${p}</option>`).join('')}
+      <option value="">${productPlaceholder}</option>
+      ${productItems.map(p => `<option value="${p}">${p}</option>`).join('')}
     </select>
     <input type="number" class="product-rate" min="0" step="0.01" placeholder="Rate"
            oninput="updatePreview()" />
@@ -780,7 +876,7 @@ function validate() {
     return err('Please select a Crop.');
   if (!document.getElementById('operator').value)
     return err('Please select an Operator.');
-  if (!document.getElementById('gpa').value)
+  if (logType === 'spray' && !document.getElementById('gpa').value)
     return err('Please enter Gallons per Acre.');
 
   const farmSelects = document.querySelectorAll('.farm-select');
@@ -825,12 +921,13 @@ async function submitForm() {
   const time     = document.getElementById('time').value;
   const crop     = document.getElementById('crop').value;
   const operator = document.getElementById('operator').value;
-  const gpa      = parseFloat(document.getElementById('gpa').value);
+  const gpa      = logType === 'spray' ? parseFloat(document.getElementById('gpa').value) : '';
+  const appType  = document.getElementById('apptype').value;
   const notes    = document.getElementById('notes').value.trim();
   const submittedAt = new Date().toISOString();
 
   const rows = buildRows().map(r => ({
-    submittedAt, date, time, crop, operator, gpa, notes,
+    submittedAt, date, time, logType, appType, crop, operator, gpa, notes,
     farm:       r.farm,
     owner:      r.owner,
     ownerPct:   r.pct,
@@ -880,6 +977,7 @@ function resetForm() {
   document.getElementById('crop').value     = '';
   document.getElementById('operator').value = '';
   document.getElementById('gpa').value      = '';
+  document.getElementById('apptype').value  = '';
   document.getElementById('notes').value    = '';
   const now = new Date();
   document.getElementById('date').value = toDateString(now);
