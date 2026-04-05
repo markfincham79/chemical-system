@@ -221,19 +221,25 @@
   /* ─── PRODUCTS TABLE ─── */
   .products-header {
     display: grid;
-    grid-template-columns: 1fr 130px 36px;
+    grid-template-columns: 1fr 110px 110px 36px;
     gap: 8px;
     padding-bottom: 6px;
     border-bottom: 1px solid var(--border);
     margin-bottom: 10px;
   }
+  .products-header.planting-mode {
+    grid-template-columns: 1fr 130px 36px;
+  }
   .product-row {
     display: grid;
-    grid-template-columns: 1fr 130px 36px;
+    grid-template-columns: 1fr 110px 110px 36px;
     gap: 8px;
     margin-bottom: 8px;
     align-items: center;
     animation: slideIn 0.18s ease;
+  }
+  .product-row.planting-mode {
+    grid-template-columns: 1fr 130px 36px;
   }
 
   @keyframes slideIn {
@@ -410,7 +416,8 @@
     .field-grid, .field-grid.three { grid-template-columns: 1fr; }
     .field-full { grid-column: 1; }
     .farm-rows-header, .farm-row { grid-template-columns: 1fr 90px 36px; }
-    .products-header, .product-row { grid-template-columns: 1fr 90px 36px; }
+    .products-header, .product-row { grid-template-columns: 1fr 80px 80px 36px; }
+    .products-header.planting-mode, .product-row.planting-mode { grid-template-columns: 1fr 90px 36px; }
   }
 </style>
 </head>
@@ -489,9 +496,10 @@
   <div class="card">
     <div class="card-header"><span id="products-icon">🧪</span><h2 id="products-title">Products Applied</h2></div>
     <div class="card-body">
-      <div class="products-header">
+      <div class="products-header" id="products-header-row">
         <label id="product-col-label">Product</label>
-        <label id="rate-col-label">Rate (oz or lbs / ac)</label>
+        <label id="amount-col-label">Total Applied</label>
+        <label id="uom-col-label">Unit</label>
         <label></label>
       </div>
       <div id="products-list"></div>
@@ -514,8 +522,8 @@
               <th>Farm Ac</th>
               <th>Owner Ac</th>
               <th>Product</th>
+              <th>Total Applied</th>
               <th>Rate</th>
-              <th>Total Used</th>
             </tr>
           </thead>
           <tbody id="preview-tbody"></tbody>
@@ -662,6 +670,11 @@ function repopulateProductSelects() {
   updatePreview();
 }
 
+function getUomFactor(uomValue) {
+  const found = UOM_OPTIONS.find(u => u.value === uomValue);
+  return found ? found.factor : 1;
+}
+
 // ═══════════════════════════════════════════════════════
 //  LOG TYPE TOGGLE
 // ═══════════════════════════════════════════════════════
@@ -674,22 +687,25 @@ function setLogType(type) {
   document.getElementById('btn-planting').classList.toggle('active', type === 'planting');
 
   // Update products card labels
+  const hdr = document.getElementById('products-header-row');
   if (type === 'planting') {
-    document.getElementById('products-icon').textContent   = '🌽';
-    document.getElementById('products-title').textContent  = 'Seeds / Traits';
+    document.getElementById('products-icon').textContent     = '🌽';
+    document.getElementById('products-title').textContent    = 'Seeds / Traits';
     document.getElementById('product-col-label').textContent = 'Seed';
-    document.getElementById('rate-col-label').textContent  = 'Seeding Rate (seeds/ac)';
-    document.getElementById('add-product-btn').textContent = '+ Add Seed';
-    document.getElementById('gpa-label').textContent       = 'Population (seeds/ac)';
-    document.getElementById('gpa-field').style.display     = 'none';
+    document.getElementById('amount-col-label').textContent  = 'Total Units';
+    document.getElementById('uom-col-label').textContent     = '';
+    document.getElementById('add-product-btn').textContent   = '+ Add Seed';
+    document.getElementById('gpa-field').style.display       = 'none';
+    hdr.classList.add('planting-mode');
   } else {
-    document.getElementById('products-icon').textContent   = '🧪';
-    document.getElementById('products-title').textContent  = 'Products Applied';
+    document.getElementById('products-icon').textContent     = '🧪';
+    document.getElementById('products-title').textContent    = 'Products Applied';
     document.getElementById('product-col-label').textContent = 'Product';
-    document.getElementById('rate-col-label').textContent  = 'Rate (oz or lbs / ac)';
-    document.getElementById('add-product-btn').textContent = '+ Add Product';
-    document.getElementById('gpa-label').textContent       = 'Gallons per Acre (GPA)';
-    document.getElementById('gpa-field').style.display     = '';
+    document.getElementById('amount-col-label').textContent  = 'Total Applied';
+    document.getElementById('uom-col-label').textContent     = 'Unit';
+    document.getElementById('add-product-btn').textContent   = '+ Add Product';
+    document.getElementById('gpa-field').style.display       = '';
+    hdr.classList.remove('planting-mode');
   }
 
   // Rebuild product rows with correct list
@@ -766,24 +782,49 @@ function updateAcreTotal() {
 //  PRODUCT ROWS
 // ═══════════════════════════════════════════════════════
 
+const UOM_OPTIONS = [
+  { label: 'Gallon',   value: 'gallon',   factor: 128  },
+  { label: 'Fl Oz',    value: 'floz',     factor: 1    },
+  { label: 'Dry Oz',   value: 'dryoz',    factor: 1    },
+  { label: 'Pound',    value: 'pound',    factor: 16   },
+  { label: 'AMS Bag',  value: 'amsbag',   factor: 816  },
+];
+
 function addProductRow() {
   productRowCount++;
   const id = `product-row-${productRowCount}`;
   const list = document.getElementById('products-list');
   const row = document.createElement('div');
-  row.className = 'product-row';
   row.id = id;
   const productItems = logType === 'planting' ? LISTS.seeds : LISTS.products;
   const productPlaceholder = logType === 'planting' ? '— Select Seed —' : '— Select Product —';
-  row.innerHTML = `
-    <select class="product-select" onchange="updatePreview()">
-      <option value="">${productPlaceholder}</option>
-      ${productItems.map(p => `<option value="${p}">${p}</option>`).join('')}
-    </select>
-    <input type="number" class="product-rate" min="0" step="0.01" placeholder="Rate"
-           oninput="updatePreview()" />
-    <button class="btn-remove" onclick="removeProductRow('${id}')" title="Remove">✕</button>
-  `;
+
+  if (logType === 'planting') {
+    row.className = 'product-row planting-mode';
+    row.innerHTML = `
+      <select class="product-select" onchange="updatePreview()">
+        <option value="">${productPlaceholder}</option>
+        ${productItems.map(p => `<option value="${p}">${p}</option>`).join('')}
+      </select>
+      <input type="number" class="product-amount" min="0" step="1" placeholder="Total Units"
+             oninput="updatePreview()" />
+      <button class="btn-remove" onclick="removeProductRow('${id}')" title="Remove">✕</button>
+    `;
+  } else {
+    row.className = 'product-row';
+    row.innerHTML = `
+      <select class="product-select" onchange="updatePreview()">
+        <option value="">${productPlaceholder}</option>
+        ${productItems.map(p => `<option value="${p}">${p}</option>`).join('')}
+      </select>
+      <input type="number" class="product-amount" min="0" step="0.01" placeholder="Amount"
+             oninput="updatePreview()" />
+      <select class="product-uom" onchange="updatePreview()">
+        ${UOM_OPTIONS.map(u => `<option value="${u.value}" ${u.value==='gallon'?'selected':''}>${u.label}</option>`).join('')}
+      </select>
+      <button class="btn-remove" onclick="removeProductRow('${id}')" title="Remove">✕</button>
+    `;
+  }
   list.appendChild(row);
 }
 
@@ -809,13 +850,27 @@ function buildRows() {
     }
   });
 
+  // Total acres across all farms (for proportional product split)
+  const totalAcres = farms.reduce((sum, f) => sum + f.acres, 0);
+
   // Collect products
   const products = [];
   document.querySelectorAll('.product-row').forEach(row => {
-    const sel  = row.querySelector('.product-select');
-    const rate = parseFloat(row.querySelector('.product-rate')?.value) || 0;
-    if (sel && sel.value) {
-      products.push({ product: sel.value, rate });
+    const sel    = row.querySelector('.product-select');
+    const amount = parseFloat(row.querySelector('.product-amount')?.value) || 0;
+    if (!sel || !sel.value) return;
+
+    if (logType === 'planting') {
+      // Planting: store total units, calculate seeds/ac per farm later
+      products.push({ product: sel.value, totalAmount: amount, uom: 'units', factor: 1 });
+    } else {
+      const uomSel = row.querySelector('.product-uom');
+      const uom    = uomSel ? uomSel.value : 'gallon';
+      const factor = getUomFactor(uom);
+      const uomLabel = UOM_OPTIONS.find(u => u.value === uom)?.label || uom;
+      // Convert total amount to oz
+      const totalOz = amount * factor;
+      products.push({ product: sel.value, totalAmount: amount, uom: uomLabel, factor, totalOz });
     }
   });
 
@@ -824,11 +879,39 @@ function buildRows() {
   const rows = [];
   farms.forEach(({ farm, acres }) => {
     const owners = farmOwnership[farm] || [{ owner: '(unassigned)', pct: 100 }];
-    products.forEach(({ product, rate }) => {
+    // Farm's proportion of total load
+    const farmProportion = totalAcres > 0 ? acres / totalAcres : 1;
+
+    products.forEach(p => {
       owners.forEach(({ owner, pct }) => {
         const ownerAcres = acres * (pct / 100);
-        const totalUsed  = rate > 0 ? (ownerAcres * rate).toFixed(2) : '';
-        rows.push({ farm, owner, pct, farmAcres: acres, ownerAcres: ownerAcres.toFixed(2), product, rate, totalUsed });
+
+        let rateDisplay, totalUsedDisplay, rateOzAc;
+
+        if (logType === 'planting') {
+          // seeds/ac = units × 80000 ÷ acres
+          rateOzAc = ownerAcres > 0 ? ((p.totalAmount * 80000) / ownerAcres).toFixed(0) : '';
+          rateDisplay      = rateOzAc ? `${rateOzAc} seeds/ac` : '—';
+          totalUsedDisplay = p.totalAmount > 0 ? `${p.totalAmount} units` : '—';
+        } else {
+          // Owner's share of total oz = totalOz × (ownerAcres / totalAcres)
+          const ownerOz  = totalAcres > 0 ? p.totalOz * (ownerAcres / totalAcres) : 0;
+          rateOzAc       = ownerAcres > 0 ? (ownerOz / ownerAcres).toFixed(2) : '';
+          rateDisplay      = rateOzAc ? `${rateOzAc} oz/ac` : '—';
+          totalUsedDisplay = p.totalAmount > 0 ? `${(p.totalAmount * farmProportion * (pct/100)).toFixed(2)} ${p.uom}` : '—';
+        }
+
+        rows.push({
+          farm, owner, pct,
+          farmAcres:       acres,
+          ownerAcres:      ownerAcres.toFixed(2),
+          product:         p.product,
+          totalAmount:     p.totalAmount,
+          uom:             p.uom,
+          rateOzAc,
+          rateDisplay,
+          totalUsedDisplay
+        });
       });
     });
   });
@@ -857,8 +940,8 @@ function updatePreview() {
       <td class="num">${r.farmAcres}</td>
       <td class="num">${r.ownerAcres}</td>
       <td>${r.product}</td>
-      <td class="num">${r.rate || '—'}</td>
-      <td class="num">${r.totalUsed || '—'}</td>
+      <td class="num">${r.totalUsedDisplay}</td>
+      <td class="num">${r.rateDisplay}</td>
     </tr>
   `).join('');
 }
@@ -928,14 +1011,16 @@ async function submitForm() {
 
   const rows = buildRows().map(r => ({
     submittedAt, date, time, logType, appType, crop, operator, gpa, notes,
-    farm:       r.farm,
-    owner:      r.owner,
-    ownerPct:   r.pct,
-    farmAcres:  r.farmAcres,
-    ownerAcres: r.ownerAcres,
-    product:    r.product,
-    rate:       r.rate,
-    totalUsed:  r.totalUsed
+    farm:         r.farm,
+    owner:        r.owner,
+    ownerPct:     r.pct,
+    farmAcres:    r.farmAcres,
+    ownerAcres:   r.ownerAcres,
+    product:      r.product,
+    totalAmount:  r.totalAmount,
+    uom:          r.uom,
+    rateOzAc:     r.rateOzAc,
+    totalUsed:    r.totalUsedDisplay
   }));
 
   showStatus('loading', `Saving ${rows.length} rows to Google Sheets…`);
