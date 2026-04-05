@@ -886,19 +886,19 @@ function buildRows() {
       owners.forEach(({ owner, pct }) => {
         const ownerAcres = acres * (pct / 100);
 
-        let rateDisplay, totalUsedDisplay, rateOzAc;
+        let rateDisplay, totalUsedDisplay, rateOzAc = '';
 
         if (logType === 'planting') {
-          // seeds/ac = units × 80000 ÷ acres
-          rateOzAc = ownerAcres > 0 ? ((p.totalAmount * 80000) / ownerAcres).toFixed(0) : '';
+          // seeds/ac = units × 80000 ÷ owner acres
+          rateOzAc         = ownerAcres > 0 ? ((p.totalAmount * 80000) / ownerAcres).toFixed(0) : '';
           rateDisplay      = rateOzAc ? `${rateOzAc} seeds/ac` : '—';
           totalUsedDisplay = p.totalAmount > 0 ? `${p.totalAmount} units` : '—';
         } else {
           // Owner's share of total oz = totalOz × (ownerAcres / totalAcres)
-          const ownerOz  = totalAcres > 0 ? p.totalOz * (ownerAcres / totalAcres) : 0;
-          rateOzAc       = ownerAcres > 0 ? (ownerOz / ownerAcres).toFixed(2) : '';
+          const ownerOz    = totalAcres > 0 ? p.totalOz * (ownerAcres / totalAcres) : 0;
+          rateOzAc         = ownerAcres > 0 ? (ownerOz / ownerAcres).toFixed(2) : '';
           rateDisplay      = rateOzAc ? `${rateOzAc} oz/ac` : '—';
-          totalUsedDisplay = p.totalAmount > 0 ? `${(p.totalAmount * farmProportion * (pct/100)).toFixed(2)} ${p.uom}` : '—';
+          totalUsedDisplay = p.totalAmount > 0 ? `${(p.totalAmount * farmProportion * (pct / 100)).toFixed(2)} ${p.uom}` : '—';
         }
 
         rows.push({
