@@ -889,10 +889,12 @@ function buildRows() {
         let rateDisplay, totalUsedDisplay, rateOzAc = '';
 
         if (logType === 'planting') {
-          // seeds/ac = units × 80000 ÷ owner acres
-          rateOzAc         = ownerAcres > 0 ? ((p.totalAmount * 80000) / ownerAcres).toFixed(0) : '';
+          // Owner's share of units = totalAmount × (ownerAcres / totalAcres)
+          const ownerUnits = totalAcres > 0 ? p.totalAmount * (ownerAcres / totalAcres) : 0;
+          // seeds/ac = ownerUnits × 80000 ÷ ownerAcres
+          rateOzAc         = ownerAcres > 0 ? ((ownerUnits * 80000) / ownerAcres).toFixed(0) : '';
           rateDisplay      = rateOzAc ? `${rateOzAc} seeds/ac` : '—';
-          totalUsedDisplay = p.totalAmount > 0 ? `${p.totalAmount} units` : '—';
+          totalUsedDisplay = ownerUnits > 0 ? `${ownerUnits.toFixed(2)} units` : '—';
         } else {
           // Owner's share of total oz = totalOz × (ownerAcres / totalAcres)
           const ownerOz    = totalAcres > 0 ? p.totalOz * (ownerAcres / totalAcres) : 0;
