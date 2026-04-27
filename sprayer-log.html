@@ -1151,9 +1151,15 @@ async function submitForm() {
   const temperature   = document.getElementById('temperature').value;
   const submittedAt   = new Date().toISOString();
 
+  // Unique ID used to find these rows in the sheet for updates
+  const submissionId = editMode && editEntry
+    ? editEntry.submissionId
+    : `GW-${Date.now()}`;
+
   const rows = buildRows().map(r => ({
     submittedAt, date, time, logType, appType, crop, operator, gpa, notes,
     windDirection, windSpeed, temperature,
+    submissionId,
     farm:         r.farm,
     owner:        r.owner,
     ownerPct:     r.pct,
@@ -1171,51 +1177,39 @@ async function submitForm() {
   showStatus('loading', `${label} ${rows.length} rows to Google Sheets…`);
   document.getElementById('submit-btn').disabled = true;
 
-  try {
-    const payload = isUpdate
-      ? { action: 'updateRows', startRow: editEntry.startRow, rowCount: editEntry.rowCount, logType, rows }
-      : { rows };
+  const payload = isUpdate
+    ? { action: 'updateRows', submissionId, logType, rows }
+    : { action: 'appendRows', rows };
 
-    const resp = await fetch(scriptUrl, {
+  try {
+    await fetch(scriptUrl, {
       method: 'POST',
+      mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    const result = await resp.json();
 
-    if (result.success) {
-      if (isUpdate) {
-        // Update the stored recent entry with new data
-        updateRecentEntry(editEntry.startRow, editEntry.logType, {
-          date, time, crop, operator, logType, appType, notes,
-          windDirection, windSpeed, temperature,
-          farms: collectFarmState(),
-          products: collectProductState(),
-          startRow: result.startRow || editEntry.startRow,
-          rowCount: result.rowCount || rows.length
-        });
-        showStatus('success', `✓ Entry updated in Google Sheets.`);
-        cancelEdit();
-      } else {
-        // Save new entry to recent submissions
-        if (result.startRow) {
-          saveRecentEntry({
-            date, time, crop, operator, logType, appType, notes,
-            windDirection, windSpeed, temperature,
-            farms: collectFarmState(),
-            products: collectProductState(),
-            startRow: result.startRow,
-            rowCount: rows.length,
-            submittedAt
-          });
-        }
-        showStatus('success', `✓ ${rows.length} rows saved to Google Sheets.`);
-        resetForm();
-      }
-      renderRecentPanel();
+    const entryData = {
+      date, time, crop, operator, logType, appType, notes,
+      windDirection, windSpeed, temperature,
+      farms: collectFarmState(),
+      products: collectProductState(),
+      submissionId,
+      submittedAt,
+      rowCount: rows.length
+    };
+
+    if (isUpdate) {
+      updateRecentEntry(submissionId, entryData);
+      showStatus('success', `✓ Entry updated in Google Sheets.`);
+      cancelEdit();
     } else {
-      showStatus('error', `Error: ${result.error || 'Unknown error from server.'}`);
+      saveRecentEntry(entryData);
+      showStatus('success', `✓ ${rows.length} rows saved to Google Sheets.`);
+      resetForm();
     }
+    renderRecentPanel();
+
   } catch (err) {
     showStatus('error', 'Network error — check your connection and try again.');
     console.error(err);
@@ -1309,9 +1303,9 @@ function saveRecentEntry(entry) {
   localStorage.setItem(RECENT_KEY, JSON.stringify(trimmed));
 }
 
-function updateRecentEntry(startRow, logType, updatedEntry) {
+function updateRecentEntry(submissionId, updatedEntry) {
   const recent = loadRecent();
-  const idx = recent.findIndex(e => e.startRow === startRow && e.logType === logType);
+  const idx = recent.findIndex(e => e.submissionId === submissionId);
   if (idx !== -1) recent[idx] = updatedEntry;
   else recent.unshift(updatedEntry);
   localStorage.setItem(RECENT_KEY, JSON.stringify(recent.slice(0, 3)));
