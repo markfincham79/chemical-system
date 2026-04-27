@@ -412,6 +412,102 @@
   }
   footer a:hover { text-decoration: underline; }
 
+  /* ─── RECENT SUBMISSIONS ─── */
+  .recent-panel {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 14px;
+  }
+  .recent-panel-header {
+    background: var(--cream-dark);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .recent-panel-header h2 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--green);
+    flex: 1;
+  }
+  .recent-list { padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .recent-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--cream);
+  }
+  .recent-item-info { flex: 1; min-width: 0; }
+  .recent-item-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--brown);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .recent-item-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--gray);
+    margin-top: 2px;
+  }
+  .btn-edit {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 14px;
+    background: transparent;
+    color: var(--blue);
+    border: 1px solid var(--blue);
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+  }
+  .btn-edit:hover { background: var(--blue); color: #fff; }
+  .edit-mode-banner {
+    background: #EBF3FB;
+    border: 1px solid var(--blue);
+    border-left: 4px solid var(--blue);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: #1A3F6F;
+    display: none;
+    align-items: center;
+    gap: 10px;
+  }
+  .edit-mode-banner.visible { display: flex; }
+  .edit-mode-banner strong { font-weight: 600; }
+  .btn-cancel-edit {
+    margin-left: auto;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    background: transparent;
+    color: var(--gray);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-cancel-edit:hover { background: var(--cream-dark); }
+
   @media (max-width: 580px) {
     .field-grid, .field-grid.three { grid-template-columns: 1fr; }
     .field-full { grid-column: 1; }
@@ -469,6 +565,28 @@
         <div class="field">
           <label>Application Type <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
           <select id="apptype"><option value="">— Select Type —</option></select>
+        </div>
+        <div class="field">
+          <label>Wind Direction <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+          <select id="wind-direction">
+            <option value="">— Select —</option>
+            <option value="N">North</option>
+            <option value="NE">Northeast</option>
+            <option value="E">East</option>
+            <option value="SE">Southeast</option>
+            <option value="S">South</option>
+            <option value="SW">Southwest</option>
+            <option value="W">West</option>
+            <option value="NW">Northwest</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Wind Speed <span style="font-weight:400;text-transform:none;letter-spacing:0">(mph, optional)</span></label>
+          <input type="number" id="wind-speed" min="0" step="0.1" placeholder="e.g. 8" />
+        </div>
+        <div class="field">
+          <label>Temperature <span style="font-weight:400;text-transform:none;letter-spacing:0">(°F, optional)</span></label>
+          <input type="number" id="temperature" min="-50" max="150" step="1" placeholder="e.g. 72" />
         </div>
       </div>
     </div>
@@ -543,6 +661,13 @@
     </div>
   </div>
 
+  <!-- EDIT MODE BANNER -->
+  <div class="edit-mode-banner" id="edit-mode-banner">
+    <span>✏️</span>
+    <span><strong>Edit Mode</strong> — Update the fields below and click "Update Submission" to overwrite the original entry.</span>
+    <button class="btn-cancel-edit" onclick="cancelEdit()">Cancel</button>
+  </div>
+
   <!-- SUBMIT -->
   <div class="submit-row">
     <div class="status" id="status">
@@ -550,6 +675,12 @@
       <span id="status-text"></span>
     </div>
     <button class="btn-submit" id="submit-btn" onclick="submitForm()">Submit Application Log</button>
+  </div>
+
+  <!-- RECENT SUBMISSIONS -->
+  <div class="recent-panel" id="recent-panel" style="display:none">
+    <div class="recent-panel-header"><span>🕓</span><h2>Recent Submissions</h2></div>
+    <div class="recent-list" id="recent-list"></div>
   </div>
 
   <footer>
@@ -581,6 +712,12 @@ let LISTS = {
 
 let farmRowCount    = 0;
 let productRowCount = 0;
+
+// Edit mode state
+let editMode = false;
+let editEntry = null; // { startRow, rowCount, logType, ... }
+
+const RECENT_KEY = 'greenwing_recent_submissions';
 
 // ═══════════════════════════════════════════════════════
 //  SCRIPT URL
@@ -1002,17 +1139,21 @@ async function submitForm() {
     return;
   }
 
-  const date     = document.getElementById('date').value;
-  const time     = document.getElementById('time').value;
-  const crop     = document.getElementById('crop').value;
-  const operator = document.getElementById('operator').value;
-  const gpa      = logType === 'spray' ? parseFloat(document.getElementById('gpa').value) : '';
-  const appType  = document.getElementById('apptype').value;
-  const notes    = document.getElementById('notes').value.trim();
-  const submittedAt = new Date().toISOString();
+  const date          = document.getElementById('date').value;
+  const time          = document.getElementById('time').value;
+  const crop          = document.getElementById('crop').value;
+  const operator      = document.getElementById('operator').value;
+  const gpa           = logType === 'spray' ? parseFloat(document.getElementById('gpa').value) : '';
+  const appType       = document.getElementById('apptype').value;
+  const notes         = document.getElementById('notes').value.trim();
+  const windDirection = document.getElementById('wind-direction').value;
+  const windSpeed     = document.getElementById('wind-speed').value;
+  const temperature   = document.getElementById('temperature').value;
+  const submittedAt   = new Date().toISOString();
 
   const rows = buildRows().map(r => ({
     submittedAt, date, time, logType, appType, crop, operator, gpa, notes,
+    windDirection, windSpeed, temperature,
     farm:         r.farm,
     owner:        r.owner,
     ownerPct:     r.pct,
@@ -1025,18 +1166,56 @@ async function submitForm() {
     totalUsed:    r.totalUsedDisplay
   }));
 
-  showStatus('loading', `Saving ${rows.length} rows to Google Sheets…`);
+  const isUpdate = editMode && editEntry;
+  const label = isUpdate ? 'Updating' : 'Saving';
+  showStatus('loading', `${label} ${rows.length} rows to Google Sheets…`);
   document.getElementById('submit-btn').disabled = true;
 
   try {
-    await fetch(scriptUrl, {
+    const payload = isUpdate
+      ? { action: 'updateRows', startRow: editEntry.startRow, rowCount: editEntry.rowCount, logType, rows }
+      : { rows };
+
+    const resp = await fetch(scriptUrl, {
       method: 'POST',
-      mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rows })
+      body: JSON.stringify(payload)
     });
-    showStatus('success', `✓ ${rows.length} rows saved to Google Sheets.`);
-    resetForm();
+    const result = await resp.json();
+
+    if (result.success) {
+      if (isUpdate) {
+        // Update the stored recent entry with new data
+        updateRecentEntry(editEntry.startRow, editEntry.logType, {
+          date, time, crop, operator, logType, appType, notes,
+          windDirection, windSpeed, temperature,
+          farms: collectFarmState(),
+          products: collectProductState(),
+          startRow: result.startRow || editEntry.startRow,
+          rowCount: result.rowCount || rows.length
+        });
+        showStatus('success', `✓ Entry updated in Google Sheets.`);
+        cancelEdit();
+      } else {
+        // Save new entry to recent submissions
+        if (result.startRow) {
+          saveRecentEntry({
+            date, time, crop, operator, logType, appType, notes,
+            windDirection, windSpeed, temperature,
+            farms: collectFarmState(),
+            products: collectProductState(),
+            startRow: result.startRow,
+            rowCount: rows.length,
+            submittedAt
+          });
+        }
+        showStatus('success', `✓ ${rows.length} rows saved to Google Sheets.`);
+        resetForm();
+      }
+      renderRecentPanel();
+    } else {
+      showStatus('error', `Error: ${result.error || 'Unknown error from server.'}`);
+    }
   } catch (err) {
     showStatus('error', 'Network error — check your connection and try again.');
     console.error(err);
@@ -1061,11 +1240,14 @@ function toDateString(d) { return d.toISOString().split('T')[0]; }
 function toTimeString(d) { return d.toTimeString().slice(0, 5); }
 
 function resetForm() {
-  document.getElementById('crop').value     = '';
-  document.getElementById('operator').value = '';
-  document.getElementById('gpa').value      = '';
-  document.getElementById('apptype').value  = '';
-  document.getElementById('notes').value    = '';
+  document.getElementById('crop').value           = '';
+  document.getElementById('operator').value       = '';
+  document.getElementById('gpa').value            = '';
+  document.getElementById('apptype').value        = '';
+  document.getElementById('notes').value          = '';
+  document.getElementById('wind-direction').value = '';
+  document.getElementById('wind-speed').value     = '';
+  document.getElementById('temperature').value    = '';
   const now = new Date();
   document.getElementById('date').value = toDateString(now);
   document.getElementById('time').value = toTimeString(now);
@@ -1083,6 +1265,159 @@ function resetForm() {
 }
 
 // ═══════════════════════════════════════════════════════
+//  COLLECT FORM STATE (for saving to recent)
+// ═══════════════════════════════════════════════════════
+
+function collectFarmState() {
+  const farms = [];
+  document.querySelectorAll('[id^="farm-row-"]').forEach(wrapper => {
+    const sel   = wrapper.querySelector('.farm-select');
+    const acres = wrapper.querySelector('.farm-acres');
+    if (sel && sel.value) farms.push({ farm: sel.value, acres: acres ? acres.value : '' });
+  });
+  return farms;
+}
+
+function collectProductState() {
+  const products = [];
+  document.querySelectorAll('.product-row').forEach(row => {
+    const sel    = row.querySelector('.product-select');
+    const amount = row.querySelector('.product-amount');
+    const uomSel = row.querySelector('.product-uom');
+    if (sel && sel.value) products.push({
+      product: sel.value,
+      amount:  amount ? amount.value : '',
+      uom:     uomSel ? uomSel.value : ''
+    });
+  });
+  return products;
+}
+
+// ═══════════════════════════════════════════════════════
+//  RECENT SUBMISSIONS — localStorage
+// ═══════════════════════════════════════════════════════
+
+function loadRecent() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); }
+  catch { return []; }
+}
+
+function saveRecentEntry(entry) {
+  const recent = loadRecent();
+  recent.unshift(entry);
+  const trimmed = recent.slice(0, 3);
+  localStorage.setItem(RECENT_KEY, JSON.stringify(trimmed));
+}
+
+function updateRecentEntry(startRow, logType, updatedEntry) {
+  const recent = loadRecent();
+  const idx = recent.findIndex(e => e.startRow === startRow && e.logType === logType);
+  if (idx !== -1) recent[idx] = updatedEntry;
+  else recent.unshift(updatedEntry);
+  localStorage.setItem(RECENT_KEY, JSON.stringify(recent.slice(0, 3)));
+}
+
+function renderRecentPanel() {
+  const recent = loadRecent();
+  const panel  = document.getElementById('recent-panel');
+  const list   = document.getElementById('recent-list');
+  if (!recent.length) { panel.style.display = 'none'; return; }
+
+  panel.style.display = '';
+  list.innerHTML = recent.map((e, i) => {
+    const farmNames = (e.farms || []).map(f => f.farm).join(', ') || '—';
+    const products  = (e.products || []).map(p => p.product).join(', ') || '—';
+    const typeIcon  = e.logType === 'planting' ? '🌽' : '🧪';
+    const timeStr   = e.time || '';
+    return `
+      <div class="recent-item">
+        <div class="recent-item-info">
+          <div class="recent-item-title">${typeIcon} ${e.date} ${timeStr} · ${e.crop || '—'} · ${e.operator || '—'}</div>
+          <div class="recent-item-meta">Farms: ${farmNames} &nbsp;|&nbsp; ${e.logType === 'planting' ? 'Seeds' : 'Products'}: ${products}</div>
+        </div>
+        <button class="btn-edit" onclick="loadEditEntry(${i})">Edit</button>
+      </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  EDIT MODE
+// ═══════════════════════════════════════════════════════
+
+function loadEditEntry(idx) {
+  const recent = loadRecent();
+  const entry  = recent[idx];
+  if (!entry) return;
+
+  editMode  = true;
+  editEntry = entry;
+
+  // Switch log type if needed
+  if (entry.logType !== logType) setLogType(entry.logType);
+
+  // Fill simple fields
+  document.getElementById('date').value           = entry.date || '';
+  document.getElementById('time').value           = entry.time || '';
+  document.getElementById('operator').value       = entry.operator || '';
+  document.getElementById('crop').value           = entry.crop || '';
+  document.getElementById('apptype').value        = entry.appType || '';
+  document.getElementById('notes').value          = entry.notes || '';
+  document.getElementById('wind-direction').value = entry.windDirection || '';
+  document.getElementById('wind-speed').value     = entry.windSpeed || '';
+  document.getElementById('temperature').value    = entry.temperature || '';
+  if (entry.logType === 'spray' && entry.gpa !== undefined) {
+    document.getElementById('gpa').value = entry.gpa || '';
+  }
+
+  // Rebuild farm rows
+  document.getElementById('farm-rows-list').innerHTML = '';
+  farmRowCount = 0;
+  (entry.farms || []).forEach(f => {
+    addFarmRow();
+    const wrapper = document.querySelector(`[id^="farm-row-"]:last-child`);
+    if (!wrapper) return;
+    const sel   = wrapper.querySelector('.farm-select');
+    const acres = wrapper.querySelector('.farm-acres');
+    if (sel)   { sel.value = f.farm; updateOwnerBadges(sel); }
+    if (acres) acres.value = f.acres;
+  });
+  if (!entry.farms || !entry.farms.length) addFarmRow();
+
+  // Rebuild product rows
+  document.getElementById('products-list').innerHTML = '';
+  productRowCount = 0;
+  (entry.products || []).forEach(p => {
+    addProductRow();
+    const row    = document.querySelector('.product-row:last-child');
+    if (!row) return;
+    const sel    = row.querySelector('.product-select');
+    const amount = row.querySelector('.product-amount');
+    const uomSel = row.querySelector('.product-uom');
+    if (sel)    sel.value    = p.product;
+    if (amount) amount.value = p.amount;
+    if (uomSel && p.uom) uomSel.value = p.uom;
+  });
+  if (!entry.products || !entry.products.length) addProductRow();
+
+  updatePreview();
+  updateAcreTotal();
+
+  // Show edit banner, update submit button
+  document.getElementById('edit-mode-banner').classList.add('visible');
+  document.getElementById('submit-btn').textContent = 'Update Submission';
+
+  // Scroll to top of form
+  document.querySelector('main').scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelEdit() {
+  editMode  = false;
+  editEntry = null;
+  document.getElementById('edit-mode-banner').classList.remove('visible');
+  document.getElementById('submit-btn').textContent = 'Submit Application Log';
+}
+
+// ═══════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════
 
@@ -1093,6 +1428,7 @@ async function init() {
 
   addFarmRow();
   addProductRow();
+  renderRecentPanel();
 
   await fetchLists();
 }
