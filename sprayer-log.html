@@ -1098,8 +1098,6 @@ function validate() {
     return err('Please select a Crop.');
   if (!document.getElementById('operator').value)
     return err('Please select an Operator.');
-  if (logType === 'spray' && !document.getElementById('gpa').value)
-    return err('Please enter Gallons per Acre.');
 
   const farmSelects = document.querySelectorAll('.farm-select');
   let hasFarm = false;
@@ -1157,19 +1155,19 @@ async function submitForm() {
     : `GW-${Date.now()}`;
 
   const rows = buildRows().map(r => ({
-    submittedAt, date, time, logType, appType, crop, operator, gpa, notes,
+    submittedAt, date, time, logType, appType, crop, operator, gpa,
+    farm:          r.farm,
+    farmAcres:     r.farmAcres,
+    owner:         r.owner,
+    ownerPct:      r.pct,
+    ownerAcres:    r.ownerAcres,
+    product:       r.product,
+    totalAmount:   r.totalAmount,
+    uom:           r.uom,
+    rateOzAc:      r.rateOzAc,
     windDirection, windSpeed, temperature,
-    submissionId,
-    farm:         r.farm,
-    owner:        r.owner,
-    ownerPct:     r.pct,
-    farmAcres:    r.farmAcres,
-    ownerAcres:   r.ownerAcres,
-    product:      r.product,
-    totalAmount:  r.totalAmount,
-    uom:          r.uom,
-    rateOzAc:     r.rateOzAc,
-    totalUsed:    r.totalUsedDisplay
+    notes,
+    submissionId
   }));
 
   const isUpdate = editMode && editEntry;
