@@ -412,6 +412,73 @@
   }
   footer a:hover { text-decoration: underline; }
 
+  /* ─── DATE LOOKUP ─── */
+  .lookup-panel {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 14px;
+  }
+  .lookup-panel-header {
+    background: var(--cream-dark);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .lookup-panel-header h2 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--green);
+    flex: 1;
+  }
+  .lookup-body {
+    padding: 12px 14px;
+  }
+  .lookup-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .lookup-row input[type="date"] {
+    flex: 1;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--cream);
+    color: var(--brown);
+  }
+  .btn-lookup {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 16px;
+    background: var(--green);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+  }
+  .btn-lookup:hover { opacity: 0.88; }
+  .btn-lookup:disabled { opacity: 0.5; cursor: default; }
+  .lookup-results { display: flex; flex-direction: column; gap: 8px; }
+  .lookup-empty {
+    font-size: 13px;
+    color: var(--gray);
+    text-align: center;
+    padding: 8px 0;
+  }
+
   /* ─── RECENT SUBMISSIONS ─── */
   .recent-panel {
     background: var(--white);
@@ -675,6 +742,18 @@
       <span id="status-text"></span>
     </div>
     <button class="btn-submit" id="submit-btn" onclick="submitForm()">Submit Application Log</button>
+  </div>
+
+  <!-- DATE LOOKUP -->
+  <div class="lookup-panel">
+    <div class="lookup-panel-header"><span>🔍</span><h2>Look Up by Date</h2></div>
+    <div class="lookup-body">
+      <div class="lookup-row">
+        <input type="date" id="lookup-date" />
+        <button class="btn-lookup" id="lookup-btn" onclick="lookupByDate()">Search</button>
+      </div>
+      <div class="lookup-results" id="lookup-results"></div>
+    </div>
   </div>
 
   <!-- RECENT SUBMISSIONS -->
@@ -1410,13 +1489,94 @@ function cancelEdit() {
 }
 
 // ═══════════════════════════════════════════════════════
+//  DATE LOOKUP — fetches from Google Sheet via GET
+// ═══════════════════════════════════════════════════════
+
+async function lookupByDate() {
+  const dateVal = document.getElementById('lookup-date').value;
+  if (!dateVal) return;
+
+  const scriptUrl = getScriptUrl();
+  if (!scriptUrl) {
+    document.getElementById('lookup-results').innerHTML =
+      '<div class="lookup-empty">No script URL configured.</div>';
+    return;
+  }
+
+  const btn = document.getElementById('lookup-btn');
+  btn.disabled = true;
+  btn.textContent = 'Searching…';
+  document.getElementById('lookup-results').innerHTML =
+    '<div class="lookup-empty">Searching…</div>';
+
+  try {
+    const sheetType = logType === 'planting' ? 'planting' : 'spray';
+    const url = `${scriptUrl}?action=getByDate&date=${encodeURIComponent(dateVal)}&logType=${sheetType}`;
+    const resp = await fetch(url);
+    const result = await resp.json();
+
+    if (!result.success) {
+      document.getElementById('lookup-results').innerHTML =
+        `<div class="lookup-empty">Error: ${result.error || 'Unknown error'}</div>`;
+      return;
+    }
+
+    const entries = result.entries || [];
+    if (!entries.length) {
+      document.getElementById('lookup-results').innerHTML =
+        `<div class="lookup-empty">No ${sheetType} entries found for ${dateVal}.</div>`;
+      return;
+    }
+
+    // Render results — each unique submissionId as one card
+    document.getElementById('lookup-results').innerHTML = entries.map((e, i) => {
+      const typeIcon = e.logType === 'planting' ? '🌽' : '🧪';
+      const farmNames = (e.farms || []).map(f => f.farm).join(', ') || '—';
+      const products  = (e.products || []).map(p => p.product).join(', ') || '—';
+      return `
+        <div class="recent-item">
+          <div class="recent-item-info">
+            <div class="recent-item-title">${typeIcon} ${e.date} ${e.time} · ${e.crop || '—'} · ${e.operator || '—'}</div>
+            <div class="recent-item-meta">Farms: ${farmNames} &nbsp;|&nbsp; ${e.logType === 'planting' ? 'Seeds' : 'Products'}: ${products}</div>
+          </div>
+          <button class="btn-edit" onclick="loadLookupEntry(${i})">Edit</button>
+        </div>`;
+    }).join('');
+
+    // Store results temporarily for loadLookupEntry
+    window._lookupEntries = entries;
+
+  } catch (err) {
+    document.getElementById('lookup-results').innerHTML =
+      '<div class="lookup-empty">Network error — check connection.</div>';
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Search';
+  }
+}
+
+function loadLookupEntry(idx) {
+  const entry = window._lookupEntries && window._lookupEntries[idx];
+  if (!entry) return;
+  // Save into recent so the normal edit flow works
+  saveRecentEntry(entry);
+  renderRecentPanel();
+  // Load it into the form
+  loadEditEntry(0); // it was just unshifted to position 0
+  // Clear lookup results
+  document.getElementById('lookup-results').innerHTML = '';
+}
+
+// ═══════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════
 
 async function init() {
   const now = new Date();
-  document.getElementById('date').value = toDateString(now);
-  document.getElementById('time').value = toTimeString(now);
+  document.getElementById('date').value        = toDateString(now);
+  document.getElementById('time').value        = toTimeString(now);
+  document.getElementById('lookup-date').value = toDateString(now);
 
   addFarmRow();
   addProductRow();
